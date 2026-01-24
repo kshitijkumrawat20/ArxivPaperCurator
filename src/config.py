@@ -35,7 +35,7 @@ class ArxivSettings(BaseConfigSettings):
     search_category: str = "cs.AI"
     download_max_retries: int = 3 
     download_retry_delay_secs : float = 5.0
-    max_concurrent_downlaods : int = 5
+    max_concurrent_downloads : int = 5
     max_concurrent_parsing : int = 1 
     
     namespace: dict  = {
