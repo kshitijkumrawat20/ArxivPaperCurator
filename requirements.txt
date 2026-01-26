@@ -3,3 +3,4 @@ pydantic
 fastapi 
 docling 
 httpx
+apache-airflow
