@@ -52,6 +52,6 @@ class BaseRepository(ABC): # abstract base class for repository pattern
         
         """
 
-        
+    
 
     
