@@ -1,12 +1,12 @@
 import logging
-from contextlib import contextmanager
-from typing import Generator 
+from contextlib import contextmanager # it is used to create context managers for resource management
+from typing import Generator  # it is used for type hinting of generator functions means it will generate a sequence of values.
 from sqlalchemy import create_engine, text, inspect
 from pydantic import Field 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings # it is used to create settings classes with validation and parsing capabilities
 from sqlalchemy.ext.declarative import declarative_base # it is used to create a base class for declarative class definitions
-from sqlalchemy.orm import sessionmaker, Session
-from src.db.interface.base import BaseDatabase
+from sqlalchemy.orm import sessionmaker, Session # it is used to create a session factory and manage database sessions
+from src.db.interface.base import BaseDatabase # import the abstract base class for database interactions
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class PostgreSQLDatabase(BaseDatabase):
                 self.config.database_url,
                 echo = self.config.echo_sql,
                 pool_size = self.config.pool_size,
-                max_overflow = self.config.max_overflow
+                max_overflow = self.config.max_overflow,
                 pool_pre_ping = True # to check if the connection is alive before using it
             )
             self.session_factory = sessionmaker(
