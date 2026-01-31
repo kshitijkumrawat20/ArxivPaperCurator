@@ -11,3 +11,10 @@ def get_database():
     return _database
 
 
+@contextmanager 
+def get_db_session():
+    """Get a database session context manager."""
+    database = get_database()
+    with database.get_session() as session:
+        yield session
+
