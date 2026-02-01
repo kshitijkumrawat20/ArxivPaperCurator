@@ -27,3 +27,20 @@ class PaperRepository:
     def get_all(self, limit: int = 100, offset: int = 0) -> List[Paper]:
         return self.session.query(Paper).order_by(Paper.published_date.desc()).limit(limit).offset(offset).all()
         
+    def update(self, paper: Paper) -> Paper: 
+        self.session.add(paper) # re-add to session to mark as dirty
+        self.session.commit() 
+        self.session.refresh(paper) # refresh to get updated fields
+        return paper
+    
+    def upsert(self, paper_create: PaperCreate) -> Paper:
+        # Check if the paper already exists by arxiv_id
+        exisiting_paper = self.get_by_arxiv_id(paper_create.arxive_id)
+        if exisiting_paper:
+            # Update the existing paper
+            for key, value in paper_create.model_dump(exclude_unset=True).items():
+                setattr(exisiting_paper, key, value)
+            return self.update(exisiting_paper)
+        else:
+            # Create a new paper
+            return self.create(paper_create)
