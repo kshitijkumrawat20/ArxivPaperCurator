@@ -8,7 +8,6 @@ from sqlalchemy.ext.declarative import declarative_base # it is used to create a
 from sqlalchemy.orm import sessionmaker, Session # it is used to create a session factory and manage database sessions
 from src.db.interface.base import BaseDatabase # import the abstract base class for database interactions
 
-
 logger = logging.getLogger(__name__)
 
 class PostgresqlSettings(BaseSettings): 

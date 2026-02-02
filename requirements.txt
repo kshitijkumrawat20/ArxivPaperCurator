@@ -1,6 +1,8 @@
 ipykernel
 pydantic 
 fastapi 
-docling[cpu] 
 httpx
 apache-airflow
+pydantic-settings
+sqlalchemy
+psycopg2-binary

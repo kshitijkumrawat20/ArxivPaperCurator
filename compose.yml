@@ -1,7 +1,6 @@
 services: 
-  # API services 
   api: 
-    build: . # build image of current directory
+    build: .
     container_name: rag-api
     ports: 
       - "8000:8000"
@@ -16,11 +15,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    environment: ## setting varibles inside the container
+    environment:
       - OPENSEARCH_HOST=http://opensearch:9200
       - OLLAMA_HOST=http://ollama:11434
       - POSTGRES_DATABASE_URL=postgres+psycopg2://rag_user:rag_password@postgres:5432/rag_db
-      - ENVIRONMENT = development
+      - ENVIRONMENT=development
     networks:
       - rag-networks
 
@@ -31,12 +30,12 @@ services:
       - discovery.type=single-node
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
       - DISABLE_SECURITY_PLUGIN=true
-      - bootstrap.memory_lock = true
+      - bootstrap.memory_lock=true
     ports:
-      - "9200:9200" # OpenSearch REST API
-      - "9600:9600" # OpenSearch Performance Analyzer
-    ulimits: # To prevent memory issues
-      memlock: # it is recommended to set both soft and hard limits to -1 because it allows the container to lock as much memory as needed without restrictions.
+      - "9200:9200"
+      - "9600:9600"
+    ulimits:
+      memlock:
         soft: -1
         hard: -1
     volumes:
@@ -46,7 +45,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
     networks:
       - rag-networks
@@ -58,15 +57,16 @@ services:
       - "5601:5601"
     environment:
       - OPENSEARCH_HOSTS=http://opensearch:9200
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN = true
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
     depends_on:
-      - opensearch
+      opensearch:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
       interval: 30s
       timeout: 10s  
       retries: 5
-      start_period: 60s
+      start_period: 120s
     networks:
       - rag-networks
   
@@ -74,20 +74,17 @@ services:
     image: apache/airflow:3.0.3
     container_name: rag-airflow
     environment:
-    # core settings
-      - AIRFLOW_CORE_EXECUTOR = localExecutor 
-      - AIRFLOW_DATABASE_SQL_ALCHEMY_CONN = postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
-      - AIRFLOW_CORE_LOAD_EXAMPLES = false
-      # set the airflow home to keep the config files organized 
-      - AIRFLOW_HOME = /opt/airflow/home 
-      # environment variable to point to our dags folder which has tasks 
-      - POSTGRES_DATABASE_URL = postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
-      - OPENSEARCH_HOST = http://opensearch:9200
-      - PYTHONPATH = /opt/airflow/src 
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW_HOME=/opt/airflow/home
+      - POSTGRES_DATABASE_URL=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
+      - OPENSEARCH_HOST=http://opensearch:9200
+      - PYTHONPATH=/opt/airflow/src 
     volumes:
-      - ./airflow/dags:/opt/airflow/dags # mount airflow folder as ariflow home 
-      - ./src:/opt/airflow/src  # mount only src folder for DAG access 
-      - airlfow_logs:/opt/airflow/logs
+      - ./airflow/dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - airflow_logs:/opt/airflow/logs
     ports:
       - "8080:8080"
     depends_on:
@@ -96,11 +93,11 @@ services:
       opensearch:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health || exit 1"]
-      interval: 1m30s
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/v2/health || exit 1"]
+      interval: 60s
       timeout: 30s
       retries: 5
-      start_period: 30s
+      start_period: 120s
     entrypoint: /bin/bash
     command: >
       -c "
@@ -134,26 +131,23 @@ services:
       - POSTGRES_USER=rag_user
       - POSTGRES_PASSWORD=rag_password
       - POSTGRES_DB=rag_db
-      - POSTGRES_HOST_AUTH_METHOD = password 
-      - PGDATA= /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./airflow/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql # initialize the database with required tables
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rag_user"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_db"]
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
     networks:
       - rag-networks
 
 volumes:
   postgres-data:
   opensearch-data:
-  airlfow_logs:
+  airflow_logs:
   ollama_data:
 
 networks:
@@ -163,4 +157,3 @@ networks:
 
 
 
-      

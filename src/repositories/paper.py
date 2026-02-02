@@ -1,7 +1,6 @@
 from typing import List , Optional
 from uuid import UUID
 from sqlalchemy import select
-from sympy import limit
 from src.models.paper import Paper
 from src.schemas.arxiv.paper import PaperCreate
 from sqlalchemy.orm import Session

@@ -2,10 +2,10 @@ import logging
 import os 
 from contextlib import asynccontextmanager # it is used for managing the lifespan of the app means startup and shutdown events
 from fastapi import FastAPI
-from src.config import get_settings
+from config import get_settings
 # from src.db.factory import make_database
 
-from src.routers import ask, papers, ping
+from routers import ask, papers, ping
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -42,18 +42,17 @@ async def lifespan(app : FastAPI):
 
 
 app = FastAPI(
-    title = "ArXiv Paper Search and Analysis API", 
-    description = "Personal arXiv CS.AI paper curator with RAG capabilities",
-    version = os.getenv("APP_VERSION", "0.1.0"),
-    root_path = "api/v1", 
+    title="ArXiv Paper Search and Analysis API", 
+    description="Personal arXiv CS.AI paper curator with RAG capabilities",
+    version=os.getenv("APP_VERSION", "0.1.0"),
     lifespan=lifespan
 )
 
 
-# Include routers 
-app.include_router(ping.router)
-app.include_router(papers.router)
-app.include_router(ask.router)
+# Include routers with /api/v1 prefix
+app.include_router(ping.router, prefix="/api/v1")
+app.include_router(papers.router, prefix="/api/v1")
+app.include_router(ask.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

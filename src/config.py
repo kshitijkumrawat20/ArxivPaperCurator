@@ -125,9 +125,9 @@ class LangfuseSettings(BaseConfigSettings):
 class Settings(BaseConfigSettings):
     app_version: str = "0.1.0"
     debug: bool = True
-    environment : Literal["development", "staging", "production"] = "development"
-    sevice_name : str = "rag-api"
-    postgress_database_url : str = "postgresql://rag_user:rag_password@localhost:5432/rag_db"
+    environment: Literal["development", "staging", "production"] = "development"
+    service_name: str = "rag-api"
+    postgress_database_url: str = "postgresql://rag_user:rag_password@localhost:5432/rag_db"
     postgres_echo_sql: bool = False # whether to echo SQL statements to the console
     postgres_pool_size: int = 20 # maximum number of database connections in the pool
     postgres_max_overflow: int = 10 # maximum number of connections to allow in overflow

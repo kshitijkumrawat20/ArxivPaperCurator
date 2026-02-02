@@ -56,7 +56,7 @@ class PaperResponse(PaperBase):
     updated_at: datetime = Field(..., description="The date when the paper record was last updated.")
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PaperSearchResponse(BaseModel):
     paper: List[PaperResponse] = Field(..., description="List of papers matching the search criteria.")

@@ -2,19 +2,19 @@ from typing import List , Optional, Dict
 from pydantic import BaseModel, Field
 
 class ServiceStatus(BaseModel):
-    """Individual service  schema."""
+    """Individual service schema."""
 
-    status : str = Field(..., description="service status", examples="healthy")
-    message: Optional[str] = Field(..., description="Status message", example = "Connected to database successfully")
+    status: str = Field(..., description="Service status", examples=["healthy", "ok", "error"])
+    detail: Optional[str] = Field(None, description="Status detail message", examples=["Connected to database successfully"])
 
 
 class HealthResponse(BaseModel):
     """Health check response schema."""
-    status : str = Field (..., description="Overall system status", example="ok")
-    version: str = Field(..., description="Version of the application", example="0.1.0")
-    environment: str = Field(..., description="Environment the application is running in", example="production")
-    servicename :  str = Field(..., description="Name of the service", example="arxiv-rag-api-service")
-    services : Optional[Dict[str, ServiceStatus]] = Field(None, description="Statuses of individual services")
+    status: str = Field(..., description="Overall system status", examples=["ok", "degraded", "error"])
+    version: str = Field(..., description="Version of the application", examples=["0.1.0"])
+    environment: str = Field(..., description="Environment the application is running in", examples=["production", "development"])
+    service_name: str = Field(..., description="Name of the service", examples=["arxiv-rag-api-service"])
+    services: Optional[Dict[str, ServiceStatus]] = Field(None, description="Statuses of individual services")
 
     class Config: 
         """Pydantic configuration."""

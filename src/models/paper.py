@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import JSON, Boolean, Column,  DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from src.db.interface.base import Base
+from src.db.interface.base import BaseDatabase
 
 
-class Paper(Base): 
+class Paper(BaseDatabase): 
     __tablename__ = "papers"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     arxiv_id = Column(String, unique=True, nullable=False, index=True)
