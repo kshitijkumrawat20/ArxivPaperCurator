@@ -1,6 +1,6 @@
 ipykernel
 pydantic 
 fastapi 
-docling 
+docling[cpu] 
 httpx
 apache-airflow

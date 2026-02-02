@@ -13,12 +13,12 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Set environment variables for UV
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=COPY
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 #intall deps 
-RUN --mount = type = cache, target = /root/.cache/uv \  
-    --mount = type = bind, source = uv.lock, target = /app/uv.lock \
-    --mount = type = bind, source = pyproject.toml, target = /app/pyproject.toml \
+RUN --mount=type=cache,target=/root/.cache/uv \  
+    --mount=type=bind,source=uv.lock,target=/app/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=/app/pyproject.toml \
     uv sync --frozen --no-dev
 
     
@@ -42,7 +42,7 @@ ENV APP_VERSION=${VERSION}
 WORKDIR /app
 COPY --from=base /app /app
 
-ENV PATH = "/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Run the application 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
