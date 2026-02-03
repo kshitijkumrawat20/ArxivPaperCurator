@@ -6,12 +6,12 @@ from ..services.ollama import OllamaClient
 
 router = APIRouter(prefix="/ping", tags=["health"])
 
-@router.get("/ping", tags = "Health")
+@router.get("/ping", tags=["health"])
 async def ping():
     """Simple ping endpoint to check if the service is running."""
     return {"status": "ok", "message": "pong"}
 
-@router.get("/health", response_model=HealthResponse,description="Check the health of the services including database and ollama", response_description="Health check response", tags=["Health"])
+@router.get("/health", response_model=HealthResponse,description="Check the health of the services including database and ollama", response_description="Health check response", tags=["health"])
 async def health_check(
     settings : SettingDep,
     database: DatabaseDep
