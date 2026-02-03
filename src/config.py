@@ -12,10 +12,9 @@ ENV_FILE_PATH  = PROJECT_ROOT / ".env"
 class BaseConfigSettings(BaseSettings):
     """Base configuration class for the application settings."""
     model_config = SettingsConfigDict(
-        env_file = [".env", str(ENV_FILE_PATH)],
+        env_file=".env" if Path(".env").exists() else None,
+        env_file_encoding="utf-8",
         extra="ignore", # Ignore extra environment variables not defined in the model
-        frozen = True, # Make the settings immutable after creation
-        env_nested_delimiter= "__", # Support nested environment variables using double underscores
         case_sensitive=False # Environment variable names are case insensitive
     )
 
@@ -127,7 +126,7 @@ class Settings(BaseConfigSettings):
     debug: bool = True
     environment: Literal["development", "staging", "production"] = "development"
     service_name: str = "rag-api"
-    postgress_database_url: str = "postgresql://rag_user:rag_password@localhost:5432/rag_db"
+    postgres_database_url: str = "postgresql://rag_user:rag_password@localhost:5432/rag_db"
     postgres_echo_sql: bool = False # whether to echo SQL statements to the console
     postgres_pool_size: int = 20 # maximum number of database connections in the pool
     postgres_max_overflow: int = 10 # maximum number of connections to allow in overflow
@@ -144,7 +143,7 @@ class Settings(BaseConfigSettings):
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
 
-    @field_validator("postgress_database_url")
+    @field_validator("postgres_database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         if not v.startswith("postgresql://"):

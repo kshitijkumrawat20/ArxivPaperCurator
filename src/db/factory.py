@@ -12,7 +12,7 @@ def make_database() -> BaseDatabase:
 
     settings = get_settings()
     config = PostgresqlSettings(
-        database_url = settings.postgress_database_url, 
+        database_url = settings.postgres_database_url, 
         echo_sql = settings.postgres_echo_sql,
         pool_size = settings.postgres_pool_size,
         max_overflow = settings.postgres_max_overflow

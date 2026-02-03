@@ -2,10 +2,10 @@ import logging
 import os 
 from contextlib import asynccontextmanager # it is used for managing the lifespan of the app means startup and shutdown events
 from fastapi import FastAPI
-from config import get_settings
-# from src.db.factory import make_database
+from src.config import get_settings
+from src.db.factory import make_database
 
-from routers import ask, papers, ping
+from src.routers import ask, papers, ping
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -26,8 +26,8 @@ async def lifespan(app : FastAPI):
 
     settings = get_settings()
     app.state.settings = settings # store settings in app state for global access 
-    # database = make_database() 
-    # app.state.database = database
+    database = make_database() 
+    app.state.database = database
     logger.info("Database connected.")
 
     app.state.pdf_parser_service = None 
@@ -37,7 +37,7 @@ async def lifespan(app : FastAPI):
 
     yield  # Control is handed over to the application here.
 
-    # database.teardown()
+    database.teardown()
     logger.info("Shutting down the application...")
 
 

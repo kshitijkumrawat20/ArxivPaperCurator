@@ -67,7 +67,7 @@ class PostgreSQLDatabase(BaseDatabase):
 
             # test the connection 
             with self.engine.connect() as conn: 
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
                 logger.info("PostgreSQL database connection established successfully.")
 
             # check the tables if they dont exist
@@ -78,7 +78,7 @@ class PostgreSQLDatabase(BaseDatabase):
             Base.metadata.create_all(bind = self.engine)
 
             # checking if any new tables were created
-            updated_tables = inspector.get_tables_names()
+            updated_tables = inspector.get_table_names()
             new_tables = set(updated_tables) - set(existing_tables)
 
             if new_tables:
@@ -96,27 +96,27 @@ class PostgreSQLDatabase(BaseDatabase):
             logger.error(f"Error during PostgreSQL database startup: {e}")
             raise
 
-        def teardown(self) -> None:
-            """Close the database connection"""
-            if self.engine: 
-                self.engine.dispose() # Dispose of the engine and its connection pool
-                logger.info("PostgreSQL database connection closed successfully.")
+    def teardown(self) -> None:
+        """Close the database connection"""
+        if self.engine: 
+            self.engine.dispose() # Dispose of the engine and its connection pool
+            logger.info("PostgreSQL database connection closed successfully.")
 
-        @contextmanager # it is used for providing a context manager for database sessions
-        def get_session(self) -> Generator[Session, None, None]: # here the generator is a type hint that indicates that this function will yield Session objects
-            """Provide a database session for executing queries."""
-            if not self.session_factory:
-                raise RuntimeError("Database session factory is not initialized. Call startup() first.")
-            session = self.session_factory()
+    @contextmanager # it is used for providing a context manager for database sessions
+    def get_session(self) -> Generator[Session, None, None]: # here the generator is a type hint that indicates that this function will yield Session objects
+        """Provide a database session for executing queries."""
+        if not self.session_factory:
+            raise RuntimeError("Database session factory is not initialized. Call startup() first.")
+        session = self.session_factory()
 
-            try: 
-                yield session
-            except Exception as e:
-                session.rollback() # rollback the session in case of exception
-                logger.error(f"Session rollback because of exception: {e}")
-            finally:
-                session.close()
-                logger.info("Session closed successfully.")
+        try: 
+            yield session
+        except Exception as e:
+            session.rollback() # rollback the session in case of exception
+            logger.error(f"Session rollback because of exception: {e}")
+        finally:
+            session.close()
+            logger.debug("Session closed successfully.")
 
             
 
