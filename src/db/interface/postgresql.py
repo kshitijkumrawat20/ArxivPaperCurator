@@ -1,8 +1,9 @@
 import logging
 from contextlib import contextmanager # it is used to create context managers for resource management
-from typing import Generator  # it is used for type hinting of generator functions means it will generate a sequence of values.
+from typing import Generator, Optional  # it is used for type hinting of generator functions means it will generate a sequence of values.
 from sqlalchemy import create_engine, text, inspect
 from pydantic import Field 
+from sqlalchemy.engine import Engine  # it is used to represent the core interface to the database
 from pydantic_settings import BaseSettings # it is used to create settings classes with validation and parsing capabilities
 from sqlalchemy.ext.declarative import declarative_base # it is used to create a base class for declarative class definitions
 from sqlalchemy.orm import sessionmaker, Session # it is used to create a session factory and manage database sessions
@@ -43,8 +44,8 @@ class PostgreSQLDatabase(BaseDatabase):
 
     def __init__(self, config: PostgresqlSettings):
         self.config = config
-        self.engine = None
-        self.session_factory = None 
+        self.engine: Optional[Engine] = None
+        self.session_factory: Optional[Sessionmaker] = None 
 
     def startup(self) -> None:
         """Initiazlize the database connection """
@@ -66,6 +67,7 @@ class PostgreSQLDatabase(BaseDatabase):
             )
 
             # test the connection 
+            assert self.engine is not None
             with self.engine.connect() as conn: 
                 conn.execute(text("SELECT 1"))
                 logger.info("PostgreSQL database connection established successfully.")
@@ -88,6 +90,7 @@ class PostgreSQLDatabase(BaseDatabase):
             
             logger.info("PostgreSQL databse connection is intialized successfully.")
 
+            assert self.engine is not None
             logger.info(f"Database: {self.engine.url.database}" )
             logger.info(f"Total Tables: {', '.join(updated_tables) if updated_tables else 'None'}")
             logger.info("Database connection is established successfully.")
