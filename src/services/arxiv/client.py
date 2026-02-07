@@ -20,12 +20,12 @@ class ArxivClient:
         self._settings = settings # _settings is private attribute following OOP convention of prefixing with underscore for internal use and showing OOPS encapsulation
         self._last_request_time : Optional[float] = None
 
-        @cached_property # caches the property value after first computation
-        def pdf_cache_dir(self) -> Path: 
-            """PDF cache directory."""
-            cache_dir = Path(self._settings.pdf_cache_dir)
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            return cache_dir
+    @cached_property # caches the property value after first computation
+    def pdf_cache_dir(self) -> Path: 
+        """PDF cache directory."""
+        cache_dir = Path(self._settings.pdf_cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
 
 
     @property
