@@ -11,6 +11,7 @@ from src.schemas.arxiv.paper import ArxivPaper, PaperCreate
 from src.schemas.pdf_parser.models import PdfContent, ParserType
 from src.services.arxiv.client import ArxivClient
 from src.services.pdf_parser.parser import PDFParserService
+from src.schemas.pdf_parser.models import ParsedPaper, ArxivMetadata
 logger = logging.getLogger(__name__)
 
 class MetadataFetcher:
@@ -212,3 +213,59 @@ class MetadataFetcher:
                 results["errors"].extend([f"Parse failure for paper {arxiv_id}" for arxiv_id in results["parse_failures"]])
             
             return results
+    
+    async def _download_and_parse_pipeline(
+        self, 
+        paper: ArxivPaper,
+        download_semaphore: asyncio.Semaphore,
+        parse_semaphore: asyncio.Semaphore
+    ) -> tuple:
+        """
+        Complete pipeline for download and parsing for a single paper with true parallelism between download and parse steps.
+        returns:
+            tuple: (download_success: bool, parsed_paper: Optional[ParsedPaper])
+        """
+        
+        download_success = False
+        parsed_paper = None
+
+        try: 
+            async with download_semaphore: # Download PDF with download concurrency control
+                logger.info(f"Starting download for paper {paper.arxiv_id} with download semaphore control.")
+                pdf_path = await self.arxiv_client.download_pdf(paper)
+                if pdf_path:
+                    download_success = True
+                    logger.info(f"Downloaded PDF for paper {paper.arxiv_id} to {pdf_path}.")
+                else:
+                    logger.warning(f"Failed to download PDF for paper {paper.arxiv_id}.")
+                    return (False, None) # early return on download failure
+            async with parse_semaphore: # Parse PDF with parse concurrency control
+                pdf_content = await self.pdf_parser.parse_pdf(pdf_path, paper.arxiv_id)
+                if pdf_content:
+                    logger.info(f"Parsed PDF for paper {paper.arxiv_id} successfully.")
+                else:
+                    logger.warning(f"Failed to parse PDF for paper {paper.arxiv_id}.")
+                if pdf_content:
+                    arxiv_metadata = ArxivMetadata(
+                        title=paper.title,
+                        authors=paper.authors,
+                        abstract=paper.abstract,
+                        arxiv_id=paper.arxiv_id,
+                        categories=paper.categories,
+                        published_date=paper.published_date,
+                        pdf_url=paper.pdf_url
+                    )
+
+                    parsed_paper = ParsedPaper(
+                        arxiv_metadata=arxiv_metadata,
+                        pdf_content=pdf_content
+                    )
+                    logger.debug(f"Parse completed: {paper.arxiv_id} - {len(pdf_content)} characters of content extracted.")
+                else:
+                    logger.warning(f"No content extracted from PDF for paper {paper.arxiv_id}.")
+        except Exception as e:
+            logger.error(f"Error in download and parse pipeline for paper {paper.arxiv_id}: {str(e)}")
+            raise MetadataFetchingException(f"Error in download and parse pipeline for paper {paper.arxiv_id}: {str(e)}") 
+        return (download_success, parsed_paper)
+        
+                
