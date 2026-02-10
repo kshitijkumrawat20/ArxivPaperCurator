@@ -151,7 +151,7 @@ class MetadataFetcher:
                 A dictionary with counts of downloaded and parsed PDFs, parsed paper data, and any errors encountered.
             """
 
-            result = {
+            results = {
                 "downloaded": 0,
                 "parsed": 0,
                 "parsed_papers": {}, # key: arxiv_id, value: parsed content
@@ -168,8 +168,47 @@ class MetadataFetcher:
             pipeline_tasks = [
                 self._download_and_parse_pipeline(
                     paper, 
-                    download_semaphore,
-                    parse_semaphore
+                    download_semaphore, # download limiter
+                    parse_semaphore # parse limiter
                 )
                 for paper in papers
-            ]
+            ] # it will return a list of coroutine objects for each paper for example [coroutine1, coroutine2, coroutine3, ...] where each coroutine represents the download and parse pipeline for a specific paper
+            # wait for all pipelines to complete
+            pipeline = await asyncio.gather(*pipeline_tasks, return_exceptions=True) # gather will run all the coroutines concurrently and return a list of results in the same order as the input list. If return_exceptions=True, it will capture exceptions as part of the results instead of raising them immediately.
+
+            # process results with detailed error tracking 
+            for paper, result in zip(papers, pipeline): # zip object yields n length tuples of (paper, result) for example (paper1, result1), (paper2, result2) ...
+                if isinstance(result, Exception): # ifinstance checks if result is an exception object, which means the pipeline for that paper failed with an error
+                    error_msg = f"Pipeline error for paper {paper.arxiv_id}: {str(result)}"
+                    logger.error(error_msg)
+                    results["errors"].append(error_msg)
+                elif result:
+                    download_success, parsed_paper = result
+                    if download_success:
+                        results["downloaded"] += 1
+                        if parsed_paper:
+                            results["parsed"] += 1
+                            results["parsed_papers"][paper.arxiv_id] = parsed_paper
+                        else: 
+                            results["parse_failures"].append(paper.arxiv_id)
+                    else:
+                        results["download_failures"].append(paper.arxiv_id)
+                else:
+
+                    results["download_failures"].append(paper.arxiv_id)
+
+            logger.info(f"PDF processing: {results['downloaded']} downloaded, {len(results['parse_failures'])} parse failures, {len(results['download_failures'])} download failures.")
+
+            if results["download_failures"]:
+                logger.warning(f"Download failures for {len(results['download_failures'])}")
+
+            if results["parse_failures"]:
+                logger.warning(f"Parse failures for {len(results['parse_failures'])}")
+            
+            ## adding specific failure info to general error list for backward compatibility and summary reporting
+            if results["download_failures"]:
+                results["errors"].extend([f"Download failure for paper {arxiv_id}" for arxiv_id in results["download_failures"]])
+            if results["parse_failures"]:
+                results["errors"].extend([f"Parse failure for paper {arxiv_id}" for arxiv_id in results["parse_failures"]])
+            
+            return results
