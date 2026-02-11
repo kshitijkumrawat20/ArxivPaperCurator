@@ -269,3 +269,125 @@ class MetadataFetcher:
         return (download_success, parsed_paper)
         
                 
+    def serialize_parsed_content(self, parsed_paper: ParsedPaper) -> Dict[str, Any]:
+        """
+        Serialize the parsed paper content into a dictionary format suitable for database storage.
+        Args:
+            parsed_paper (ParsedPaper): The parsed paper object containing metadata and PDF content.
+        Returns:
+            Dict[str, Any]: A dictionary representation of the parsed paper ready for database insertion.
+        """
+        try:
+            pdf_content = parsed_paper.pdf_content
+
+            # serialize sections with content and metadata
+            sections = [{"title": section.title, "content": section.content} for section in pdf_content.sections]
+            # serialize reference 
+            references = list(pdf_content.references)
+            return {
+                "raw_text" : pdf_content.raw_text,
+                "sections": sections,
+                "references": references,
+                "parser_used": pdf_content.parser_used.value,
+                "parser_metadata": pdf_content.metadata or {},
+                "pdf_processed" : True,
+                "pdf_processing_date" : datetime.now()
+            }
+        except Exception as e:
+            logger.error(f"Error serializing parsed content for paper {parsed_paper.arxiv_metadata.arxiv_id}: {str(e)}")
+            return {"pdf_processed": False, "parsed_metadata": {"error": str(e)}}
+    
+    def _store_papers_to_db(self, papers: List[ArxivPaper], parsed_papers: Dict[str, ParsedPaper], db_session: Session) -> int:
+        """ 
+        Store the fetched and processed papers into the database using the provided session.
+        Args: 
+            papers: List of ArxivPaper metadata objects.
+            parsed_papers: Dictionary of parsed paper content keyed by arxiv_id.
+            db_session: SQLAlchemy session for database operations.
+        Returns:
+            int: The number of papers successfully stored in the database.
+        """
+        paper_repo = PaperRepository(db_session)
+        stored_count = 0
+        for paper in papers:
+            try:
+                parsed_paper  = parsed_papers.get(paper.arxiv_id)
+
+                # Base paper data 
+                published_date = (date_parser.parse(paper.published_date) if isinstance(paper.published_date, str) else paper.published_date)
+                paper_data = {
+                    "arxiv_id": paper.arxiv_id,
+                    "title": paper.title,
+                    "authors": paper.authors,
+                    "abstract": paper.abstract,
+                    "categories": paper.categories,
+                    "published_date": published_date,
+                    "pdf_url": paper.pdf_url
+                }
+                
+                # add parsed content if available
+                if parsed_paper:
+                    parsed_content = self.serialize_parsed_content(parsed_paper)
+                    paper_data.update(parsed_content)
+                    logger.debug(
+                        f"storing paper {paper.arxiv_id} with parsed content: ({len(parsed_content.get('raw_text', '')) if parsed_content.get('raw_text') else 0} characters)"
+                    )
+                else:
+                    paper_data.update(
+                        {
+                            "pdf_processed": False,
+                            "parser_metadata": {"note": "pdf processing not available or failed."}
+                        }
+                    )
+                    logger.debug(f"storing paper {paper.arxiv_id} without parsed content with metdata only.")
+                
+                paper_create = PaperCreate(**paper_data)
+                stored_paper = paper_repo.upsert(paper_create)
+
+                if stored_paper:
+                    stored_count += 1
+                    content_info = "with parsed content" if parsed_paper else "with metadata only"
+                    logger.info(f"Stored paper {paper.arxiv_id} in database with ID {stored_paper.id} {content_info}.")
+            except Exception as e:
+                logger.error(f"Error storing paper {paper.arxiv_id} to database: {str(e)}")
+            
+        try: 
+            db_session.commit()
+            logger.info(f"Database commit successful for {stored_count} papers.")
+        except Exception as e:
+            logger.error(f"Database commit failed after storing papers: {str(e)}")
+            db_session.rollback()
+            stored_count = 0 # reset count if commit fails
+        return stored_count
+
+def make_metadata_fetcher(
+    arxiv_client: ArxivClient,
+    pdf_parser: PDFParserService,
+    pdf_cache_dir: Optional[Path] = None,
+) -> MetadataFetcher:
+    """
+    Factory function to create MetadataFetcher instance optimized for production.
+
+    Configured for typical production workloads (100 papers/day):
+    - 5 concurrent downloads (I/O bound, can handle more)
+    - 3 concurrent parsing operations (CPU intensive, use fewer)
+    - Async pipeline for optimal resource utilization
+
+    Args:
+        arxiv_client: Configured ArxivClient
+        pdf_parser: Configured PDFParserService (singleton with model caching)
+        pdf_cache_dir: Optional PDF cache directory
+
+    Returns:
+        MetadataFetcher instance optimized for production
+    """
+    return MetadataFetcher(
+        arxiv_client=arxiv_client,
+        pdf_parser=pdf_parser,
+        pdf_cache_dir=pdf_cache_dir,
+        max_concurrent_downloads=5,
+        max_concurrent_parsing=1,
+    )
+                
+
+
