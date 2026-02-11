@@ -1,167 +1,94 @@
-"""Ollama client for interacting with Ollama LLM service."""
+import logging
+from typing import Any, Dict, List, Optional
 
 import httpx
-from typing import Optional, Dict, Any, List
+from src.config import Settings
+from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaClient:
-    """
-    Client for interacting with Ollama API.
-    
-    Ollama ek local LLM server hai jo LLMs (like Llama, Mistral) ko locally run karta hai.
-    Ye client usse communicate karta hai HTTP ke through.
-    """
+    """Client for interacting with Ollama local LLM service."""
 
-    def __init__(self, settings):
-        """
-        Initialize OllamaClient with settings.
-        
-        Args:
-            settings: Application settings containing Ollama configuration
-        """
-        self.host = settings.ollama_host
-        self.model = settings.ollama_model
-        self.timeout = settings.ollama_timeout
+    def __init__(self, settings: Settings):
+        """Initialize Ollama client with settings."""
+        self.base_url = settings.ollama_host
+        self.timeout = httpx.Timeout(30.0)
 
-    async def health_check(self) -> Dict[str, str]:
+    async def health_check(self) -> Dict[str, Any]:
         """
-        Check if Ollama service is healthy and reachable.
-        
+        Check if Ollama service is healthy and responding.
         Returns:
-            Dict with status and available models
+            Dictionary with health status information
         """
-        async with httpx.AsyncClient(timeout=10) as client:
-            # Check if Ollama is running
-            response = await client.get(f"{self.host}/api/tags")
-            response.raise_for_status()
-            
-            models = response.json().get("models", [])
-            model_names = [m.get("name", "") for m in models]
-            
-            return {
-                "status": "healthy",
-                "models": model_names,
-                "host": self.host
-            }
-
-    async def generate(
-        self,
-        prompt: str,
-        model: Optional[str] = None,
-        system: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
-    ) -> str:
-        """
-        Generate text completion using Ollama.
-        
-        Args:
-            prompt: The input prompt for generation
-            model: Model to use (defaults to configured model)
-            system: Optional system prompt
-            temperature: Sampling temperature (0-1)
-            max_tokens: Maximum tokens to generate
-            
-        Returns:
-            Generated text response
-        """
-        model = model or self.model
-        
-        payload: Dict[str, Any] = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-            }
-        }
-        
-        if system:
-            payload["system"] = system
-            
-        if max_tokens:
-            payload["options"]["num_predict"] = max_tokens
-
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.host}/api/generate",
-                json=payload
-            )
-            response.raise_for_status()
-            return response.json().get("response", "")
-
-    async def chat(
-        self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
-        temperature: float = 0.7,
-    ) -> str:
-        """
-        Chat completion using Ollama.
-        
-        Args:
-            messages: List of chat messages [{"role": "user", "content": "..."}]
-            model: Model to use (defaults to configured model)
-            temperature: Sampling temperature
-            
-        Returns:
-            Assistant's response text
-        """
-        model = model or self.model
-        
-        payload = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-            }
-        }
-
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.host}/api/chat",
-                json=payload
-            )
-            response.raise_for_status()
-            return response.json().get("message", {}).get("content", "")
-
-    async def embeddings(
-        self,
-        text: str,
-        model: str = "nomic-embed-text",
-    ) -> List[float]:
-        """
-        Generate embeddings for text using Ollama.
-        
-        Args:
-            text: Text to embed
-            model: Embedding model to use
-            
-        Returns:
-            List of embedding floats
-        """
-        payload = {
-            "model": model,
-            "prompt": text,
-        }
-
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.host}/api/embeddings",
-                json=payload
-            )
-            response.raise_for_status()
-            return response.json().get("embedding", [])
-
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Check version endpoint for health
+                response = await client.get(f"{self.base_url}/api/version")
+                if response.status_code == 200:
+                    version_data = response.json()
+                    return {
+                        "status": "healthy",
+                        "message": "Ollama service is running",
+                        "version": version_data.get("version", "unknown"),
+                    }
+                else:
+                    raise OllamaException(f"Ollama returned status {response.status_code}")
+        except httpx.ConnectError as e:
+            raise OllamaConnectionError(f"Cannot connect to Ollama service: {e}")
+        except httpx.TimeoutException as e:
+            raise OllamaTimeoutError(f"Ollama service timeout: {e}")
+        except OllamaException:
+            raise
+        except Exception as e:
+            raise OllamaException(f"Ollama health check failed: {str(e)}")
     async def list_models(self) -> List[Dict[str, Any]]:
         """
-        List all available models in Ollama.
-        
+        Get list of available models.
         Returns:
             List of model information dictionaries
         """
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{self.host}/api/tags")
-            response.raise_for_status()
-            return response.json().get("models", [])
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(f"{self.base_url}/api/tags")
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("models", [])
+                else:
+                    raise OllamaException(f"Failed to list models: {response.status_code}")
+        except httpx.ConnectError as e:
+            raise OllamaConnectionError(f"Cannot connect to Ollama service: {e}")
+        except httpx.TimeoutException as e:
+            raise OllamaTimeoutError(f"Ollama service timeout: {e}")
+        except OllamaException:
+            raise
+        except Exception as e:
+            raise OllamaException(f"Error listing models: {e}")
+    async def generate(self, model: str, prompt: str, stream: bool = False, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Generate text using specified model.
+        Args:
+            model: Model name to use
+            prompt: Input prompt for generation
+            stream: Whether to stream response (not implemented)
+            **kwargs: Additional generation parameters
+        Returns:
+            Response dictionary or None if failed
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                data = {"model": model, "prompt": prompt, "stream": stream, **kwargs}
+                response = await client.post(f"{self.base_url}/api/generate", json=data)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    raise OllamaException(f"Generation failed: {response.status_code}")
+        except httpx.ConnectError as e:
+            raise OllamaConnectionError(f"Cannot connect to Ollama service: {e}")
+        except httpx.TimeoutException as e:
+            raise OllamaTimeoutError(f"Ollama service timeout: {e}")
+        except OllamaException:
+            raise
+        except Exception as e:
+            raise OllamaException(f"Error generating with Ollama: {e}")
