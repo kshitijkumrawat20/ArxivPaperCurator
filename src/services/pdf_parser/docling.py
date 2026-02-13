@@ -1,8 +1,7 @@
 import logging 
 from pathlib import Path
 from typing import List, Optional
-from pypdfium2 import pdfium
-
+import pypdfium2 as pdfium
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -66,7 +65,7 @@ class DoclingParser:
                     raise PDFValidationError(f"File {pdf_path} does not appear to be a valid PDF.")
 
             # checking the page count limit 
-            pdf_doc_len = len(pdfium.PDFDocument(pdf_path)) 
+            pdf_doc_len = len(pdfium.PdfDocument(pdf_path)) 
             if pdf_doc_len > self.max_pages:
                 logger.error(f"PDF file {pdf_path} has {pdf_doc_len} pages, which exceeds the maximum allowed {self.max_pages} pages.")
                 raise PDFValidationError(f"PDF file {pdf_path} has {pdf_doc_len} pages, which exceeds the maximum allowed {self.max_pages} pages.")
