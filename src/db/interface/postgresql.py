@@ -45,7 +45,7 @@ class PostgreSQLDatabase(BaseDatabase):
     def __init__(self, config: PostgresqlSettings):
         self.config = config
         self.engine: Optional[Engine] = None
-        self.session_factory: Optional[Sessionmaker] = None 
+        self.session_factory: Optional[sessionmaker] = None 
 
     def startup(self) -> None:
         """Initiazlize the database connection """
