@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text 
 from ..dependencies import DatabaseDep , SettingDep
-from ..schemas.health import HealthResponse, ServiceStatus
+from ..schemas.api.health import HealthResponse, ServiceStatus
 from ..services.ollama import OllamaClient 
 
 router = APIRouter(prefix="/ping", tags=["health"])

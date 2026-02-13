@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager # it is used for managing the lifespa
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-
+from src.services.arxiv.factory import make_arxiv_client
+from src.services.pdf_parser.factory import make_pdf_parser_service
 from src.routers import ask, papers, ping
+import uvicorn
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -30,10 +32,15 @@ async def lifespan(app : FastAPI):
     app.state.database = database
     logger.info("Database connected.")
 
-    app.state.pdf_parser_service = None 
-    app.state.opensearch_service = None 
-    app.state.llm_service = None 
-    logger.info("API ready")
+    # Initialize services (kept for future endpoints and notebook demos)
+    app.state.arxiv_client = make_arxiv_client()
+    app.state.pdf_parser = make_pdf_parser_service()
+    logger.info("Services initialized: arXiv API client, PDF parser")
+
+    # app.state.pdf_parser_service = None 
+    # app.state.opensearch_service = None 
+    # app.state.llm_service = None 
+    # logger.info("API ready")
 
     yield  # Control is handed over to the application here.
 
@@ -52,9 +59,8 @@ app = FastAPI(
 # Include routers with /api/v1 prefix
 app.include_router(ping.router, prefix="/api/v1")
 app.include_router(papers.router, prefix="/api/v1")
-app.include_router(ask.router, prefix="/api/v1")
+# app.include_router(ask.router, prefix="/api/v1")
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, port = 8000, host = "0.0.0.0")
     
