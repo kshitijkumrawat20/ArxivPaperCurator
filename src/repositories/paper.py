@@ -1,10 +1,10 @@
 from typing import List , Optional
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, func
 from src.models.paper import Paper
 from src.schemas.arxiv.paper import PaperCreate
 from sqlalchemy.orm import Session
-
+from datetime import datetime
 
 class PaperRepository:
     """
@@ -32,14 +32,51 @@ class PaperRepository:
         return db_paper
     
     def get_by_arxiv_id(self, arxiv_id: str) -> Optional[Paper]:
-        return self.session.query(Paper).filter(Paper.arxiv_id == arxiv_id).first() 
+        statement = select(Paper).where(Paper.arxiv_id == arxiv_id)
+        return self.session.scalar(statement)
     
     def get_paper_by_id(self, paper_id: UUID) -> Optional[Paper]:
-        return self.session.query(Paper).filter(Paper.id == paper_id).first()
+        statement = select(Paper).where(Paper.id == paper_id)
+        return self.session.scalar(statement)
     
     def get_all(self, limit: int = 100, offset: int = 0) -> List[Paper]:
-        return self.session.query(Paper).order_by(Paper.published_date.desc()).limit(limit).offset(offset).all()
-        
+        statement = select(Paper).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(statement))
+    
+    def get_count(self) -> int:
+        statement = select(func.count(Paper.id))
+        return self.session.scalar(statement) or 0 
+    
+    def get_processed_paper(self, limit: int = 100, offset: int = 0) -> List[Paper]:
+        """Get papers that have been processed (pdf_processed=True) with pagination."""
+        statement = select(Paper).where(Paper.pdf_processed == True).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(statement))
+    
+    def get_unprocessed_paper(self, limit: int = 100, offset: int = 0) -> List[Paper]:
+        """Get papers that have not been processed (pdf_processed=False) with pagination."""
+        statement = select(Paper).where(Paper.pdf_processed == False).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(statement))
+    
+    def papers_with_raw_text(self, limit: int = 100, offset: int = 0) -> List[Paper]:
+        """Get papers that have raw text extracted (raw_text is not null) with pagination."""
+        statement = select(Paper).where(Paper.raw_text != None).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(statement))
+    def get_processing_states(self) -> dict:
+        """Get statistics on the processing states of papers."""
+        total_papers = self.get_count()
+        processed_papers = self.session.scalar(select(func.count()).where(Paper.pdf_processed == True)) or 0
+
+        # paper with text 
+        papers_with_text = self.session.scalar(select(func.count()).where(Paper.raw_text != None)) or 0
+
+        return {
+            "total_papers": total_papers,
+            "processed_papers": processed_papers,
+            "unprocessed_papers": total_papers - processed_papers,
+            "papers_with_text": papers_with_text,
+            "processing_rate" : (processed_papers / total_papers * 100) if total_papers > 0 else 0,
+            "text_extraction_rate": (papers_with_text / processed_papers * 100) if processed_papers > 0 else 0
+        }
     def update(self, paper: Paper) -> Paper: 
         self.session.add(paper) # re-add to session to mark as dirty
         self.session.commit() 
