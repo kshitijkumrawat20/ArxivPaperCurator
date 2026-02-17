@@ -10,7 +10,7 @@ from .docling import DoclingParser
 logger = logging.getLogger(__name__)
 
 class PDFParserService:
-    def __init__(self, max_pages : int = 20, max_file_size_mb : int = 20, do_ocr : bool = False, do_tables_struture: bool = True):
+    def __init__(self, max_pages : int = 20, max_file_size_mb : int = 20, do_ocr : bool = False, do_table_structure: bool = True):
         """Initialize the PDFParserService with configuratble limits. 
          
           
@@ -18,7 +18,7 @@ class PDFParserService:
             max_pages (int, optional): Maximum number of pages to parse. Defaults to 20.
             max_file_size_mb (int, optional): Maximum file size in megabytes. Defaults to 20.
             do_ocr (bool, optional): Whether to perform OCR on scanned PDFs. Defaults to False.
-            do_tables_struture (bool, optional): Whether to extract table structure. Defaults to True.
+            do_table_structure (bool, optional): Whether to extract table structure. Defaults to True.
         
         """
 
@@ -26,7 +26,7 @@ class PDFParserService:
             max_file_size_mb=max_file_size_mb,
             max_pages=max_pages,
             do_ocr=do_ocr,
-            do_tables_struture=do_tables_struture
+            do_table_structure=do_table_structure
         )
 
         async def parse_pdf(self, file_path: Path) -> PdfContent:
