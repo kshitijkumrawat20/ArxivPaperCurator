@@ -6,3 +6,5 @@ apache-airflow
 pydantic-settings
 sqlalchemy
 psycopg2-binary
+torch[cpu]
+docling
