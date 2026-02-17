@@ -13,5 +13,5 @@ def make_arxiv_client() -> ArxivClient:
         An instance of ArxivClient.
     """
     settings = get_settings()
-    client = ArxivClient(base_url=settings.arxiv)
+    client = ArxivClient(settings=settings.arxiv)
     return client

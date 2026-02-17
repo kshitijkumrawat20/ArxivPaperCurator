@@ -81,4 +81,4 @@ class OllamaTimeoutError(OllamaException):
 
 # General application exceptions
 class ConfigurationError(Exception):
-    """Exception raised when configuration is invalid."""e
+    """Exception raised when configuration is invalid."""

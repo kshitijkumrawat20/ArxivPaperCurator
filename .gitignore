@@ -12,5 +12,3 @@ wheels/
 env/
 .env/
 
-notebooks/
-.notebooks/
