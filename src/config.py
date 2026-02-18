@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List, Union
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,6 +10,7 @@ class DefaultSettings(BaseSettings):
         extra="ignore",
         frozen=True,
         env_nested_delimiter="__",
+        env_parse_enums=True,
     )
 
 
@@ -29,7 +30,8 @@ class ArxivSettings(DefaultSettings):
     timeout_seconds: int = 30
     max_results: int = 100
     search_category: str = "cs.AI"  # Default category to search
-
+    max_retries: int = 3  # Max retries for API requests
+    download_retry_delay_secs: float = 2.0  # Base delay between retries for downloads
 
 class PDFParserSettings(DefaultSettings):
     """PDF parser service settings."""
@@ -59,7 +61,7 @@ class Settings(DefaultSettings):
 
     # Ollama configuration (used in Week 1 notebook)
     ollama_host: str = "http://localhost:11434"
-    ollama_models: List[str] = Field(default=["llama3.2:1b"])
+    ollama_models: str = Field(default="llama3.2:1b")
     ollama_default_model: str = "llama3.2:1b"
     ollama_timeout: int = 300  # 5 minutes for LLM operations
 
@@ -69,13 +71,20 @@ class Settings(DefaultSettings):
     # PDF parser settings
     pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings)
 
-    @field_validator("ollama_models", mode="before")
+    @field_validator("ollama_models", mode="after")
     @classmethod
-    def parse_ollama_models(cls, v):
-        """Parse comma-separated string into list of models."""
-        if isinstance(v, str):
-            return [model.strip() for model in v.split(",") if model.strip()]
-        return v
+    def validate_ollama_models(cls, v: str) -> str:
+        """Validate ollama models string."""
+        if not v or not v.strip():
+            return "llama3.2:1b"
+        return v.strip()
+    
+    @property
+    def ollama_models_list(self) -> List[str]:
+        """Get ollama models as a list."""
+        if "," in self.ollama_models:
+            return [m.strip() for m in self.ollama_models.split(",") if m.strip()]
+        return [self.ollama_models]
 
 
 def get_settings() -> Settings:

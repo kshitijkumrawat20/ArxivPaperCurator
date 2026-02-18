@@ -29,8 +29,8 @@ class PDFParserService:
             do_table_structure=do_table_structure
         )
 
-        async def parse_pdf(self, file_path: Path) -> PdfContent:
-            """
+    async def parse_pdf(self, file_path: Path) -> PdfContent:
+        """
             Parse a PDF file and return its content as a PdfContent object.
             Args:
                 file_path (Path): The path to the PDF file to be parsed.
@@ -39,21 +39,21 @@ class PDFParserService:
             Raises:
                 PDFParsingException: If there is an error during parsing.
                 PDFValidationError: If the parsed content fails validation.
-            """
-            if not file_path.exists():
-                logger.error(f"File not found: {file_path}") 
-                raise PDFParsingException(f"File not found: {file_path}")
-            try:
-                results = await self.docling_parser.parse_pdf(file_path)
-                if not results:
-                    logger.warning(f"No content returned for file: {file_path}")
-                    raise PDFParsingException(f"No content returned for file: {file_path}")
-                else:
-                    logger.info(f"Successfully parsed PDF file: {file_path}")
-                    return results
-            except (PDFParsingException, PDFValidationError):
-                raise
-            except Exception as e:
-                logger.error(f"Unexpected error parsing PDF: {e}")
-                raise PDFParsingException(f"Unexpected error parsing PDF: {e}")
+        """
+        if not file_path.exists():
+            logger.error(f"File not found: {file_path}") 
+            raise PDFParsingException(f"File not found: {file_path}")
+        try:
+            results = await self.docling_parser.parse_pdf(file_path)
+            if not results:
+                logger.warning(f"No content returned for file: {file_path}")
+                raise PDFParsingException(f"No content returned for file: {file_path}")
+            else:
+                logger.info(f"Successfully parsed PDF file: {file_path}")
+                return results
+        except (PDFParsingException, PDFValidationError):
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error parsing PDF: {e}")
+            raise PDFParsingException(f"Unexpected error parsing PDF: {e}")
                 

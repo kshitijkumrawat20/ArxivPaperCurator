@@ -47,11 +47,11 @@ class ArxivClient:
     @property
     def search_category(self) -> str:
         return self._settings.search_category
-    # @property
-    # def download_max_retries(self) -> int:
-    #     return self._settings.
     @property
-    def download_retry_delay_secs(self) -> float:
+    def download_max_retries(self) -> int:
+        return self._settings.max_retries
+    @property
+    def rate_limit_delay(self) -> float:
         return self._settings.rate_limit_delay
     # @property
     # def max_concurrent_downloads(self) -> int:
@@ -90,7 +90,7 @@ class ArxivClient:
         if from_date: 
             ## converting dates to arxiv format YYYYMMDDHHMMSS
             date_from = f"{from_date}000000" if from_date else "*" 
-            date_to = f"{to_date}2359" if to_date else "*"  
+            date_to = f"{to_date}235959" if to_date else "*"  
 
             # use correct arxiv api syntax with + symbol 
             search_query += f" AND submittedDate:[{date_from}+TO+{date_to}]"
@@ -114,12 +114,13 @@ class ArxivClient:
                 if time_since_last_request < self.rate_limit_delay: 
                     sleep_time = self.rate_limit_delay - time_since_last_request
                     await asyncio.sleep(sleep_time)
-                self._last_request_time = time.time()   ## after the sleep update the last request time
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 xml_data = response.text 
+            
+            self._last_request_time = time.time()  ## update after request completes
             
             papers = self._parse_response(xml_data)
             logger.info(f"Fetched {len(papers)} papers from arXiv")
@@ -231,7 +232,7 @@ class ArxivClient:
                 paper = self._parse_single_entry(entry)
                 if paper: 
                     papers.append(paper)
-                return papers 
+            return papers 
         except ET.ParseError as e:
             logger.error(f"Error parsing arXiv XML response: {e}")
             raise ArxivParseError(f"Error parsing arXiv XML response: {e}")
@@ -293,16 +294,30 @@ class ArxivClient:
     def _get_arxiv_id(self, entry: ET.Element) -> Optional[str]:
         """
         Extract arXiv ID from entry.
+        The ID is in the atom:id element as a URL like: http://arxiv.org/abs/2401.12345v1
+        We extract just the ID portion (2401.12345v1 or 2401.12345).
+        
         Args:
             entry (ET.Element): XML element representing a single paper entry.
         Returns:
             Optional[str]: arXiv ID or None if not found.
 
         """
+        # First try atom:id (this is where arXiv puts the ID as a URL)
+        id_element = entry.find("atom:id", self.namespace)
+        if id_element is not None and id_element.text is not None:
+            id_url = id_element.text.strip()
+            # Extract ID from URL: http://arxiv.org/abs/2401.12345v1 -> 2401.12345v1
+            if "/abs/" in id_url:
+                arxiv_id = id_url.split("/abs/")[-1]
+                return arxiv_id
+        
+        # Fallback: try arxiv:id element (older format)
         id_element = entry.find("arxiv:id", self.namespace)
-        if id_element is None or id_element.text is None:
-            return None
-        return id_element.text.strip()
+        if id_element is not None and id_element.text is not None:
+            return id_element.text.strip()
+            
+        return None
     
     def _get_authors(self, entry: ET.Element) -> list[str]:
         """Extract authors from entry."""
@@ -365,7 +380,7 @@ class ArxivClient:
         """Download a file from a URL with retry logic."""
 
         if max_retries is None:
-            max_retries = self._settings.download_max_retries
+            max_retries = self._settings.max_retries
 
         logger.info(f"Downloading PDF from {url} ")
 
@@ -373,7 +388,7 @@ class ArxivClient:
 
         for attempt in range(max_retries):
             try: 
-                async with httpx.AsyncClient(timeout = float(self._settings.timeout_secs)) as client: 
+                async with httpx.AsyncClient(timeout = float(self._settings.timeout_seconds)) as client: 
                     async with client.stream("GET", url) as response:
                         response.raise_for_status()
                         with open(path, "wb") as f:
