@@ -34,31 +34,31 @@ class ArxivClient:
     
     @property 
     def namespace(self) -> Dict[str, str]:
-        return self._settings.namespace
+        return self._settings.namespaces
     @property 
     def rate_limit_delay(self) -> float:
         return self._settings.rate_limit_delay
     @property 
     def timeout_secs(self) -> int:
-        return self._settings.timeout_secs
+        return self._settings.timeout_seconds
     @property
     def max_results_per_query(self) -> int:
-        return self._settings.max_results_per_query
+        return self._settings.max_results
     @property
     def search_category(self) -> str:
         return self._settings.search_category
-    @property
-    def download_max_retries(self) -> int:
-        return self._settings.download_max_retries
+    # @property
+    # def download_max_retries(self) -> int:
+    #     return self._settings.
     @property
     def download_retry_delay_secs(self) -> float:
-        return self._settings.download_retry_delay_secs
-    @property
-    def max_concurrent_downloads(self) -> int:
-        return self._settings.max_concurrent_downloads
-    @property
-    def max_concurrent_parsing(self) -> int:
-        return self._settings.max_concurrent_parsing
+        return self._settings.rate_limit_delay
+    # @property
+    # def max_concurrent_downloads(self) -> int:
+    #     return self._settings.max_concurrent_downloads
+    # @property
+    # def max_concurrent_parsing(self) -> int:
+    #     return self._settings.max_concurrent_parsing
     
     async def fetch_papers(
             self,
@@ -252,21 +252,21 @@ class ArxivClient:
             if not arxiv_id:
                 return None 
             
-            title = self._get_text(entry, "atom:title", clean_newlines = True)
+            title = self._get_text(entry, "atom:title", clean_newline = True)
             authors = self._get_authors(entry)
-            abstract = self._get_text(entry, "atom:summary", clean_newlines = True)
+            abstract = self._get_text(entry, "atom:summary", clean_newline = True)
             published = self._get_text(entry, "atom:published")
             categories = self._get_categories(entry)
-            pdf_url = self.__get_pdf_url(entry)
+            pdf_url = self._get_pdf_url(entry)
 
             return ArxivPaper(
-                id=arxiv_id,
+                arxiv_id=arxiv_id,
                 title=title,
                 authors=authors,
                 abstract=abstract,
-                published=published,
+                published_date=published,
                 categories=categories,
-                pdf_url=pdf_url,
+                pdf_url=pdf_url
             )
         except Exception as e:
             logger.error(f"Error parsing arXiv entry: {e}")
@@ -321,7 +321,7 @@ class ArxivClient:
                 categories.append(category.attrib["term"].strip())
         return categories
 
-    def _get_pdf_url(self, entry: ET.Element) -> Optional[str]:
+    def _get_pdf_url(self, entry: ET.Element):
         """Extract PDF URL from entry."""
         for link in entry.findall("atom:link", self.namespace):
             if link.get("type") == "application/pdf":
