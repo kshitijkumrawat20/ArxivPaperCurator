@@ -105,9 +105,10 @@ class MetadataFetcher:
             pdf_results  = {}
             if process_pdf: 
                 pdf_results = await self._process_pdf_batch(papers)
-            results["pdf_downloaded"] = pdf_results["downloaded"]
-            results["pdf_parsed"] = pdf_results["parsed"]
-            results["errors"].extend(pdf_results["errors"])
+                logger.debug(f"PDF Results: {pdf_results}")
+            results["pdf_downloaded"] = pdf_results.get("downloaded", 0)
+            results["pdf_parsed"] = pdf_results.get("parsed", 0)
+            results["errors"].extend(pdf_results.get("errors", []))
 
             # step: 3 store to database if requested
             if store_to_db and db_session :
@@ -186,7 +187,7 @@ class MetadataFetcher:
                 elif result:
                     download_success, parsed_paper = results
                     if download_success:
-                        results["downloaded"] += 1
+                        results["papers_downloaded"] += 1
                         if parsed_paper:
                             results["parsed"] += 1
                             results["parsed_papers"][paper.arxiv_id] = parsed_paper
