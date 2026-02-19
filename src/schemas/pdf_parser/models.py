@@ -11,7 +11,7 @@ class PaperSection(BaseModel):
     """Represents a section of a paper."""
     title : str = Field(..., description="The title of the section.")
     content: str = Field(..., description="The textual content of the section.")
-    level : int = Field(..., description="The hierarchical level of the section (e.g., 1 for top-level, 2 for subsections).")
+    level : Optional[int] = Field(None, description="The hierarchical level of the section (e.g., 1 for top-level, 2 for subsections).")
 
 class PaperFigure(BaseModel):
     """Represents a figure in the paper."""

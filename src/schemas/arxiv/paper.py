@@ -15,7 +15,7 @@ class ArxivPaper(BaseModel):
 
 class PaperBase(BaseModel):
     # core arxiv metadata 
-    arxive_id: str = Field(..., description="The unique identifier for the arXiv paper.")
+    arxiv_id: str = Field(..., description="The unique identifier for the arXiv paper.")
     title: str = Field(..., description="The title of the arXiv paper.")
     authors: List[str] = Field(..., description="List of authors of the arXiv paper.")
     abstract: str = Field(..., description="The abstract of the arXiv paper.")  
