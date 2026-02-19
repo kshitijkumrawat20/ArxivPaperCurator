@@ -184,7 +184,7 @@ class MetadataFetcher:
                     logger.error(error_msg)
                     results["errors"].append(error_msg)
                 elif result:
-                    download_success, parsed_paper = result
+                    download_success, parsed_paper = results
                     if download_success:
                         results["downloaded"] += 1
                         if parsed_paper:
@@ -240,7 +240,7 @@ class MetadataFetcher:
                     logger.warning(f"Failed to download PDF for paper {paper.arxiv_id}.")
                     return (False, None) # early return on download failure
             async with parse_semaphore: # Parse PDF with parse concurrency control
-                pdf_content = await self.pdf_parser.parse_pdf(pdf_path, paper.arxiv_id)
+                pdf_content = await self.pdf_parser.parse_pdf(pdf_path)
                 if pdf_content:
                     logger.info(f"Parsed PDF for paper {paper.arxiv_id} successfully.")
                 else:
@@ -260,7 +260,7 @@ class MetadataFetcher:
                         arxiv_metadata=arxiv_metadata,
                         pdf_content=pdf_content
                     )
-                    logger.debug(f"Parse completed: {paper.arxiv_id} - {len(pdf_content)} characters of content extracted.")
+                    logger.debug(f"Parse completed: {paper.arxiv_id} - {len(pdf_content.raw_text)} characters of content extracted.")
                 else:
                     logger.warning(f"No content extracted from PDF for paper {paper.arxiv_id}.")
         except Exception as e:

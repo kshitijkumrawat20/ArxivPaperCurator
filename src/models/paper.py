@@ -16,7 +16,6 @@ class Paper(Base):
     categories = Column(JSON, nullable=False)
     published_date = Column(DateTime, nullable=False)
     pdf_url = Column(String, nullable=False)
-
     # pdf parsing results 
     raw_text = Column(Text, nullable=True)
     references = Column(JSON, nullable=True)
@@ -26,7 +25,7 @@ class Paper(Base):
     parser_used = Column(String, nullable=True)
     parser_metadata = Column(JSON, nullable=True)
     pdf_processed = Column(Boolean, default=False)
-    pdf_processing_data = Column(DateTime, nullable=True)
+    pdf_processing_date = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
