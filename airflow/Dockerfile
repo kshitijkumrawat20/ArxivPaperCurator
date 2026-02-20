@@ -1,56 +1,52 @@
-FROM python:3.13-slim
-# Set environment variables for the application
+FROM python:3.12-slim
 
+# Set environment variables
 ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW_VERSION=2.10.3
-ENV PYTHON_VERSION=3.13
-# constraints URL for Airflow dependencies
+ENV PYTHON_VERSION=3.12
+ENV CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
 
-ENV CONSTRAINTS_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"  
-
-# Install airflow and its deps 
-RUN apt-get update && \ 
+# Install system dependencies
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    git \
-    libpq-dev \
-    poppler-utils \
-    tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
+        build-essential \
+        curl \
+        git \
+        libpq-dev \
+        poppler-utils \
+        tesseract-ocr \
+        && rm -rf /var/lib/apt/lists/*
 
-# create airflow user with UID/GID 50000 for cross platform compatibility
+# Create airflow user with UID/GID 50000 for cross-platform compatibility
 RUN groupadd -r -g 50000 airflow && useradd -r -u 50000 -g airflow -d ${AIRFLOW_HOME} -s /bin/bash airflow
 
-# creaate airflow directories with proper owenership 
+# Create airflow directories with proper ownership
 RUN mkdir -p ${AIRFLOW_HOME} && \
     mkdir -p ${AIRFLOW_HOME}/dags && \
     mkdir -p ${AIRFLOW_HOME}/logs && \
     mkdir -p ${AIRFLOW_HOME}/plugins && \
-    chown -R 50000:50000 ${AIRFLOW_HOME} # set ownership to airflow user
- # set permissions for airflow user
+    chown -R 50000:50000 ${AIRFLOW_HOME} && \
     chmod -R 755 ${AIRFLOW_HOME}
-# isntall ariflow with postgress support 
 
+# Install Airflow with PostgreSQL support
 RUN pip install --no-cache-dir \
-    "apache-airflow==${AIRFLOW_VERSION}" \
-    --constraint "${CONSTRAINTS_URL}"  \
-    psycopg2-binary 
+    "apache-airflow[postgres]==${AIRFLOW_VERSION}" \
+    --constraint "${CONSTRAINT_URL}" \
+    psycopg2-binary
 
-# copy requirements and install project deps 
-COPY requirements.txt /tmp/requirements-airflow.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt
+# Copy requirements and install project dependencies
+COPY requirements_airflow.txt /tmp/requirements_airflow.txt
+RUN pip install --no-cache-dir -r /tmp/requirements_airflow.txt
 
-# copy and set up entrypoint scripts 
+# Copy and set up entrypoint script
 COPY entrypoint.sh /entrypoint.sh
-# set permissions for airflow user to access the entrypoint script
-RUN chmod +x /entrypoint.sh 
+RUN chmod +x /entrypoint.sh
 
-# switch to airflow user and set working directory 
+# Switch to airflow user and set working directory
 USER airflow
 WORKDIR ${AIRFLOW_HOME}
 
-# EXPOSE PORT 
-EXPOSE 8080 
+# Expose port
+EXPOSE 8080
 
 CMD ["/entrypoint.sh"]
