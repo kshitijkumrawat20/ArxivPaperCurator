@@ -22,6 +22,16 @@ RUN apt-get update && \
 # create airflow user with UID/GID 50000 for cross platform compatibility
 RUN groupadd -r -g 50000 airflow && useradd -r -u 50000 -g airflow -d ${AIRFLOW_HOME} -s /bin/bash airflow
 
+# creaate airflow directories with proper owenership 
+RUN mkdir -p ${AIRFLOW_HOME} && \
+    mkdir -p ${AIRFLOW_HOME}/dags && \
+    mkdir -p ${AIRFLOW_HOME}/logs && \
+    mkdir -p ${AIRFLOW_HOME}/plugins && \
+    chown -R 50000:50000 ${AIRFLOW_HOME} # set ownership to airflow user
+ # set permissions for airflow user
+    chmod -R 755 ${AIRFLOW_HOME}
+# isntall ariflow with postgress support 
+
 RUN pip install --no-cache-dir \
     "apache-airflow==${AIRFLOW_VERSION}" \
     --constraint "${CONSTRAINTS_URL}"  \
