@@ -1,3 +1,6 @@
+
+#Central settings object first. Everything else depends on it.
+
 from typing import List, Union 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict 
