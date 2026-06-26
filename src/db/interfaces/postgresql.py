@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker 
-# from src.db.interfaces.base import BaseDatabase
+from src.db.interfaces.base import BaseDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -100,4 +100,4 @@ class PostgresSQLDatabase(BaseDatabase):
         finally:
             session.close() # Close the session to release database resources.
             logger.info("Database session closed.") # Log that the database session has been closed.
-            
+
