@@ -9,7 +9,7 @@ class OllamaClient:
     """Ollama client for health checks"""
 
     def __init__(self, settings: Settings):
-        self.base_url = settings.ollama_host: 
+        self.base_url = settings.ollama_host
         
     async def health_check(self) -> Dict[str, str]:
         """Checking if ollama service is available and healthy"""
