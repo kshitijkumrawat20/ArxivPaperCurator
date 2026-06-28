@@ -1,3 +1,5 @@
+# Wire settings, database, session injection for FastAPI.
+
 from functools import lru_cache 
 from typing import Annotated, Generator 
 from fastapi import Depends, Request 
