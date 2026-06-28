@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from src.schema.ask import AskRequest, AskResponse, PaperSource, 
+from src.schema.ask import AskRequest, AskResponse, PaperSource 
 
 router = APIRouter()
 
