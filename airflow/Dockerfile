@@ -1,13 +1,12 @@
 FROM python:3.12-slim
 
 # Set environment variables
-ENV AIRFLOW_HOME=/opt/airflow 
+ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW_VERSION=2.10.3
 ENV PYTHON_VERSION=3.12
-ENV CONSTRAINT_URL=https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt 
+ENV CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
 
-
-# INSTALL SYSTEM DEPS 
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -16,12 +15,11 @@ RUN apt-get update && \
         libpq-dev \
         poppler-utils \
         tesseract-ocr \
-        && rm -rf /var/lib/apt/lists/* 
-    
-# create airflow user with UID/GID 50000 for cross-platform compatibility
-RUN groupadd -r -g 50000 airflow && \
-    useradd -r -u 50000 -g airflow -d ${AIRFLOW_HOME} -s /bin/bash airflow 
-    
+        && rm -rf /var/lib/apt/lists/*
+
+# Create airflow user with UID/GID 50000 for cross-platform compatibility
+RUN groupadd -r -g 50000 airflow && useradd -r -u 50000 -g airflow -d ${AIRFLOW_HOME} -s /bin/bash airflow
+
 # Create airflow directories with proper ownership
 RUN mkdir -p ${AIRFLOW_HOME} && \
     mkdir -p ${AIRFLOW_HOME}/dags && \
