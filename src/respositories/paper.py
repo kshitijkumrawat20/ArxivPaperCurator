@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from src.models.paper import Paper
-from src.schemas.paper import PaperCreate
+from src.schema.paper import PaperCreate
 
 
 class PaperRepository:

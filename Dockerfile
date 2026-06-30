@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm AS base
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm AS base
 
 WORKDIR /app
 
@@ -8,7 +8,9 @@ COPY pyproject.toml uv.lock ./
 # UV_COMPILE_BYTECODE for generating .pyc files -> faster application startup.
 # UV_LINK_MODE=copy to silence warnings about not being able to use hard links
 # since the cache and sync target are on separate file systems.
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -19,7 +21,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy source code
 COPY src /app/src
 
-FROM python:3.12.8-slim AS final
+FROM python:3.13-slim-bookworm AS final
+
+# psycopg2 links dynamically against PostgreSQL's client library.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
 

@@ -1,10 +1,10 @@
 # Create the DB object from app settings.
 
-from src.config import get_settings 
+from src.config import Settings, get_settings
 from src.db.interfaces.base import BaseDatabase 
 from src.db.interfaces.postgresql import PostgresSQLDatabase, PostgresSQLSettings
 
-def make_database() -> BaseDatabase: 
+def make_database(settings: Settings | None = None) -> BaseDatabase:
     """
     Factory function to create a database instance.
 
@@ -12,7 +12,9 @@ def make_database() -> BaseDatabase:
         BaseDatabase: An instance of the database implementation (PostgreSQL in this case).
     """
 
-    settings = get_settings() # Retrieve application settings, which include database configuration.
+    # Reuse settings initialized by the application when provided, while retaining
+    # a no-argument form for callers that need the default environment settings.
+    settings = settings or get_settings()
 
     # creating PostgreSQL config from settings 
 

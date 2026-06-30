@@ -10,7 +10,9 @@ import psycopg2
 import requests
 from airflow import DAG 
 from datetime import timedelta, datetime
-from airflow.providers.standard.operators.python import PythonOperator
+# from airflow.providers.standard.operators.python import PythonOperator
+from airflow.operators.python import PythonOperator
+
 
 def hello_world():
     """Simple hello world function """

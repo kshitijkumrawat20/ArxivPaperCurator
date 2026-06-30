@@ -10,7 +10,7 @@ router = APIRouter(prefix = "/papers", tags=["Papers"])
 def get_paper_details(
     db : SessionDep, 
     arxiv_id: str = Path(
-        ..., description="The arXiv ID of the paper to retrieve details for", example="2101.00001"
+        ..., description="The arXiv ID of the paper to retrieve details for", examples=["2101.00001"]
     )
 ) -> PaperResponse: 
     """Get details of paper by arXiv ID."""
