@@ -3,9 +3,10 @@
 from fastapi import APIRouter
 from sqlalchemy.orm import Session 
 from ..dependencies import DatabaseDep, SettingsDep
-from ..schema.health import healthResponse, ServiceStatus 
+from ..schema.api.health import healthResponse, ServiceStatus 
 from ..services.ollama import OllamaClient 
 from sqlalchemy import text
+from ..exception import OllamaConnectionError, OllamaException, OllamaTimeoutError
 router = APIRouter()
 
 @router.get("/ping", tags=["Health Check"])
@@ -57,8 +58,17 @@ async def health_check(settings: SettingsDep, database: DatabaseDep) -> healthRe
         services["ollama"] = ServiceStatus(status=ollama_health["status"], message=ollama_health["message"])
         if ollama_health["status"] != "healthy":
             overall_status = "degraded"
+    except OllamaConnectionError as e:
+        services["ollama"] = ServiceStatus(status="unhealthy", message=f"Cannot connect to Ollama: {str(e)}")
+        overall_status = "degraded"
+    except OllamaTimeoutError as e:
+        services["ollama"] = ServiceStatus(status="unhealthy", message=f"Ollama timeout: {str(e)}")
+        overall_status = "degraded"
+    except OllamaException as e:
+        services["ollama"] = ServiceStatus(status="unhealthy", message=f"Ollama error: {str(e)}")
+        overall_status = "degraded"
     except Exception as e:
-        services["ollama"] = ServiceStatus(status="unhealthy", message=f"Ollama health check failed: {str(e)}")
+        services["ollama"] = ServiceStatus(status="unhealthy", message=f"Unexpected Ollama error: {str(e)}")
         overall_status = "degraded"
 
     return healthResponse(

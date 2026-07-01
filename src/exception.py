@@ -35,3 +35,58 @@ class LLMException(Exception):
 # General application exceptions
 class ConfigurationError(Exception):
     """Exception raised when configuration is invalid."""
+
+class PDFParsingException(ParsingException):
+    """Base exception for PDF parsing-related errors."""
+
+
+class PDFValidationError(PDFParsingException):
+    """Exception raised when PDF file validation fails."""
+
+
+class PDFDownloadException(Exception):
+    """Base exception for PDF download-related errors."""
+
+
+class PDFDownloadTimeoutError(PDFDownloadException):
+    """Exception raised when PDF download times out."""
+
+
+class PDFCacheException(Exception):
+    """Exception raised for PDF cache-related errors."""
+
+class ArxivAPIException(Exception):
+    """Base exception for arXiv API-related errors."""
+
+
+class ArxivAPITimeoutError(ArxivAPIException):
+    """Exception raised when arXiv API request times out."""
+
+
+class ArxivAPIRateLimitError(ArxivAPIException):
+    """Exception raised when arXiv API rate limit is exceeded."""
+
+
+class ArxivParseError(ArxivAPIException):
+    """Exception raised when arXiv API response parsing fails."""
+
+
+# Week 2+: Metadata fetching exceptions
+class MetadataFetchingException(Exception):
+    """Base exception for metadata fetching pipeline errors."""
+
+
+class PipelineException(MetadataFetchingException):
+    """Exception raised during pipeline execution."""
+
+class OllamaException(LLMException):
+    """Exception raised for Ollama service errors."""
+
+
+class OllamaConnectionError(OllamaException):
+    """Exception raised when cannot connect to Ollama service."""
+
+
+class OllamaTimeoutError(OllamaException):
+    """Exception raised when Ollama service times out."""
+

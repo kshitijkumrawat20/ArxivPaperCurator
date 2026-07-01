@@ -20,3 +20,15 @@ class Paper(Base):
     pdf_url = Column(String, nullable =False)
     created_at = Column(DateTime,default = lambda: datetime.now(timezone.utc) )
     updated_at = Column(DateTime, default = lambda: datetime.now(timezone.utc), onupdate = lambda: datetime.now(timezone.utc)) # Automatically update the updated_at column to the current UTC time whenever the row is updated.
+
+
+    # parsed Pdf Content 
+    raw_text = Column(Text, nullable=True) # Store the full raw text extracted from the PDF.
+    section = Column(JSON, nullable=True) # Store sections as a JSON array of objects with titles and content.
+    references = Column(JSON, nullable=True) # Store references as a JSON array of objects if extracted.
+    
+    # PDF processing metadata
+    parser_used = Column(String, nullable=True)
+    parser_metadata = Column(JSON, nullable=True)
+    pdf_processed = Column(Boolean, default=False, nullable=False)
+    pdf_processing_date = Column(DateTime, nullable=True)

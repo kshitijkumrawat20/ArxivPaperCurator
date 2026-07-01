@@ -4,7 +4,7 @@ import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory # auto generate test data for pydantic models
 from src.config import Settings 
 from src.schema.ask import AskRequest, PaperSource 
-from src.schema.paper import PaperCreate, PaperResponse
+from src.schema.arxiv import PaperCreate, PaperResponse
 
 @pytest.fixture # act like the depend of fastapi 
 def settings() -> Settings:
