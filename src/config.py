@@ -10,9 +10,38 @@ class DefaultSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
-        fronzen=True, 
+        frozen=True, 
         env_nested_delimiter="__"
     )
+ # adding arxiv API client settings 
+
+class ArxivSettings(DefaultSettings):
+    """Arxiv API client settings."""
+    
+    base_url: str ="https://export.arxiv.org/api/query"
+    namespaces: dict = Field(
+        default={
+            "atom": "http://www.w3.org/2005/Atom",
+            "opensearch": "http://a9.com/-/spec/opensearch/1.1/",
+            "arxiv": "http://arxiv.org/schemas/atom"
+        }
+    )
+    pdf_cache_dir: str =".data/arxiv_pdfs"
+    rate_limit_delay: float = 3.0 
+    timeout_seconds: int = 10 
+    max_results: int = 100 
+    search_category: str= "cs.AI"  # Default search category for AI papers
+
+
+class PDFParserSettings(DefaultSettings):
+    """PDF parser settings."""
+    
+    max_pages: int = 30
+    max_file_size_mb : int =20 
+    do_ocr: bool = False 
+    do_tables_structure: bool = True 
+
+
 
 class Settings(DefaultSettings):
     """Application settings."""
@@ -33,9 +62,15 @@ class Settings(DefaultSettings):
 
     # ollama configurations 
     ollama_host: str = "http://localhost:11434"
-    ollama_model: Union[str, List[str]] = Field(default = ["llama3.2:1b"])
+    ollama_model:  List[str] = Field(default = ["llama3.2:1b"])
     ollama_default_model: str = "llama3.2:1b"
     ollama_timeout : int = 300 # atleast 5 min 
+
+    # arXiv settings
+    arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
+
+    # PDF parser settings
+    pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings) 
 
     @field_validator("ollama_model", mode = "before")
     @classmethod
@@ -50,3 +85,4 @@ def get_settings() -> Settings:
     return Settings()
 
 
+#
