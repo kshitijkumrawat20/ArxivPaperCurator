@@ -26,7 +26,7 @@ class PaperTable(BaseModel):
     caption: str = Field(..., description= "Table caption")
     id: str = Field(..., description= "Unique identifier for the table")
 
-class pdfContent(BaseModel):
+class PdfContent(BaseModel):
     """Represents the content of a PDF paper."""
 
     sections: List[PaperSection] = Field(default_factory=list, description= "List of sections in the paper")
