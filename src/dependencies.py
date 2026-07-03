@@ -25,22 +25,22 @@ def get_db_session(database: BaseDatabase = Depends(get_database)) -> Generator[
     with database.get_session() as session: 
         yield session
 
-def get_pdf_parser(request: Request):  # Replace 'Any' with the actual type of the PDF parser instance
-    """Get the PDF parser instance from the request state."""
-    return request.app.state.pdf_parser 
+# def get_pdf_parser(request: Request):  # Replace 'Any' with the actual type of the PDF parser instance
+#     """Get the PDF parser instance from the request state."""
+#     return request.app.state.pdf_parser 
 
-def get_opensearch_service(request: Request): 
-    """Get the OpenSearch service instance from the app state"""
-    return getattr(request.app.state, "opensearch_service", None)  # Return None if the attribute does not exist
+# def get_opensearch_service(request: Request): 
+#     """Get the OpenSearch service instance from the app state"""
+#     return getattr(request.app.state, "opensearch_service", None)  # Return None if the attribute does not exist
 
-def get_LLM_service(request: Request): 
-    """Get the LLM service instance from the app state"""
-    return None 
+# def get_LLM_service(request: Request): 
+#     """Get the LLM service instance from the app state"""
+#     return None 
 
 # Dependency type aliases for better type hinting and readability
 SettingsDep = Annotated[Settings, Depends(get_request_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database )]
 SessionDep = Annotated[Session, Depends(get_db_session)]
-PDFParserDep = Annotated[object, Depends(get_pdf_parser)]  # Replace 'object' with the actual type of the PDF parser instance
-OpenSearchServiceDep = Annotated[object, Depends(get_opensearch_service)]  # Replace 'object' with the actual type of the OpenSearch service instance
-LLMServiceDep = Annotated[object, Depends(get_LLM_service)]  # Replace 'object' with the actual type of the LLM service instance
+# PDFParserDep = Annotated[object, Depends(get_pdf_parser)]  # Replace 'object' with the actual type of the PDF parser instance
+# OpenSearchServiceDep = Annotated[object, Depends(get_opensearch_service)]  # Replace 'object' with the actual type of the OpenSearch service instance
+# LLMServiceDep = Annotated[object, Depends(get_LLM_service)]  # Replace 'object' with the actual type of the LLM service instance
