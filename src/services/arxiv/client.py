@@ -18,7 +18,7 @@ class ArxivClient:
     
     def __init__(self, settings: ArxivSettings):
         self._settings = settings 
-        self._last_request_time = Optional[float] = None  # Track the time of the last request for rate limiting
+        self._last_request_time : Optional[float] = None  # Track the time of the last request for rate limiting
 
     @cached_property
     def pdf_cache_dir(self) -> Path: 
