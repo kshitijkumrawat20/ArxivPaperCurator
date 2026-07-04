@@ -15,6 +15,13 @@ RUN apt-get update && \
         libpq-dev \
         poppler-utils \
         tesseract-ocr \
+        libgl1 \
+        libxcb1 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+        libgomp1 \
+        libglib2.0-0 \
         && rm -rf /var/lib/apt/lists/*
 
 # Create airflow user with UID/GID 50000 for cross-platform compatibility
@@ -36,7 +43,12 @@ RUN pip install --no-cache-dir \
 
 # Copy requirements and install project dependencies
 COPY requirements-airflow.txt /tmp/requirements-airflow.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt
+# PyPI's Linux PyTorch wheel pulls CUDA/NVIDIA runtime packages. Install the
+# official CPU-only build first; Docling will reuse it when dependencies resolve.
+RUN pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch torchvision && \
+    pip install --no-cache-dir -r /tmp/requirements-airflow.txt
 
 # Copy and set up entrypoint script
 COPY entrypoint.sh /entrypoint.sh

@@ -51,4 +51,4 @@ class ParsedPaper(BaseModel):
     """Represents a parsed paper with its metadata and content."""
 
     arxiv_metadata: ArxivMetadata = Field(..., description= "Metadata from ArXiv API")
-    pdf_content: Optional[pdfContent] = Field(None, description= "Content extracted from the PDF")
+    pdf_content: Optional[PdfContent] = Field(None, description= "Content extracted from the PDF")

@@ -23,9 +23,17 @@ COPY src /app/src
 
 FROM python:3.13-slim-bookworm AS final
 
-# psycopg2 links dynamically against PostgreSQL's client library.
+# System libraries for PostgreSQL, OpenCV, and torchvision
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 \
+    && apt-get install -y --no-install-recommends \
+    libpq5 \
+    libxcb1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libglib2.0-0 \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
