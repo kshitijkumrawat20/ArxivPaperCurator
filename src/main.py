@@ -25,11 +25,11 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings 
 
-    database = make_database(settings)
+    database = make_database()
     app.state.database = database
     logger.info("Database initialized.")
-    app.state.arxiv_client = make_arxiv_client(settings)
-    app.state.pdf_parser = make_pdf_parser_service(settings)
+    app.state.arxiv_client = make_arxiv_client()
+    app.state.pdf_parser = make_pdf_parser_service()
     # app.state.opensearch_service = None  # Placeholder for OpenSearch service instance
     # app.state.LLM_service = None  # Placeholder for LLM service instance
     logger.info("API is ready")
