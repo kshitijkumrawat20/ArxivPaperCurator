@@ -24,7 +24,7 @@ class Paper(Base):
 
     # parsed Pdf Content 
     raw_text = Column(Text, nullable=True) # Store the full raw text extracted from the PDF.
-    section = Column(JSON, nullable=True) # Store sections as a JSON array of objects with titles and content.
+    sections = Column("section", JSON, nullable=True) # Store sections as a JSON array of objects with titles and content.
     references = Column(JSON, nullable=True) # Store references as a JSON array of objects if extracted.
     
     # PDF processing metadata

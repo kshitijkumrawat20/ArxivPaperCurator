@@ -1,15 +1,15 @@
-import logging 
-from pathlib import Path 
-from typing import Optional 
-from fastapi import logger
-import pypdfium2 as pdfium 
+import logging
+from pathlib import Path
+from typing import Optional
+
+import pypdfium2 as pdfium
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions 
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from src.exception import PDFParsingException, PDFValidationError 
-from src.schema.pdf_parser.models import PaperFigure, PaperTable, PaperSection, ParserType, PdfContent 
+from src.exception import PDFParsingException, PDFValidationError
+from src.schema.pdf_parser.models import PaperFigure, PaperTable, PaperSection, ParserType, PdfContent
 
-logging = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 class DoclingParser: 
     """Docling PDF parser for fallback when GOBID fails"""
@@ -37,7 +37,7 @@ class DoclingParser:
             do_ocr = do_ocr,
         )
 
-        self.converter = DocumentConverter(
+        self._converter = DocumentConverter(
             format_options = {
                 InputFormat.PDF: PdfFormatOption(
                     pipeline_options=pipeline_options
@@ -47,6 +47,7 @@ class DoclingParser:
         self._warmed_up = False 
         self.max_pages = max_pages 
         self.max_file_size_mb = max_file_size_mb * 1024 * 1024  # Convert MB to bytes
+        self.max_file_size_bytes = self.max_file_size_mb
 
     def _warm_up_models(self):
         """Pre-warm the models with a small dummy document to avoid cold start."""
@@ -115,23 +116,32 @@ class DoclingParser:
 
             # convert PDF
             # limit processing to avoid memory issue with Large papers
-            result = self._converter.convert(str(pdf_path), max_num_pages = self.max_pages, max_file_size = self.max_file_size_bytes)
+            result = self._converter.convert(
+                str(pdf_path),
+                max_num_pages=self.max_pages,
+                max_file_size=self.max_file_size_bytes,
+            )
 
             # extract structured content 
             doc = result.document 
 
             # extract sections
-            sections = [
-            ]
-            current_sections = {"title":"Content", "content": ""}
+            sections = []
+            current_section = {"title": "Content", "content": "", "level": 1}
 
             for element in doc.texts:
                 if hasattr(element, "label") and element.label in ["title", "section_header"]:
                     # Save previous section if it has content
                     if current_section["content"].strip():
-                        sections.append(PaperSection(title=current_section["title"], content=current_section["content"].strip()))
+                        sections.append(
+                            PaperSection(
+                                title=current_section["title"],
+                                content=current_section["content"].strip(),
+                                level=current_section["level"],
+                            )
+                        )
                     # Start new section
-                    current_section = {"title": element.text.strip(), "content": ""}
+                    current_section = {"title": element.text.strip(), "content": "", "level": 1}
                 else:
                     # Add content to current section
                     if hasattr(element, "text") and element.text:
@@ -139,7 +149,13 @@ class DoclingParser:
 
             # Add final section
             if current_section["content"].strip():
-                sections.append(PaperSection(title=current_section["title"], content=current_section["content"].strip()))
+                sections.append(
+                    PaperSection(
+                        title=current_section["title"],
+                        content=current_section["content"].strip(),
+                        level=current_section["level"],
+                    )
+                )
 
             # Focus on what arXiv API doesn't provide: structured full text content only
             return PdfContent(

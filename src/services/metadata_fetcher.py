@@ -88,7 +88,7 @@ class MetadataFetcher:
 
         try:
             # Step 1: Fetch paper metadata from arXiv
-            papers = await self.arxiv_client.fetch_papers(
+            papers = await self.arxiv_client.fetch_paperts(
                 max_results=max_results, from_date=from_date, to_date=to_date, sort_by="submittedDate", sort_order="descending"
             )
 

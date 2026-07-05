@@ -117,7 +117,7 @@ class ArxivClient:
                 response.raise_for_status()  # Raise an error for bad responses (4xx or 5xx)
                 xml_data = response.text
             
-            papers = self._parse_respnse(xml_data)
+            papers = self._parse_response(xml_data)
             logger.info(f"fetched {len(papers)} papers from arXiv API successfully.")
 
             return papers

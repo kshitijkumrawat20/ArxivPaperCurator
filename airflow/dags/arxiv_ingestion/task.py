@@ -4,10 +4,11 @@ import sys
 from datetime import datetime, timedelta 
 from functools import lru_cache 
 from typing import Any, Tuple 
-from src.config import get_settings
 
-# Add project root to python path for imports 
+# Add project root to python path before importing project modules.
 sys.path.insert(0, "/opt/airflow")
+
+from src.config import get_settings
 
 # all imports at the top 
 from sqlalchemy import text 
