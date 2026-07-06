@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 class ParserType(str, Enum):
     """Enumeration for different types of parsers."""
     DOCLING = "docling"
-    GROBID = "grobid" 
 
 class PaperSection(BaseModel):
     """REPRESENTS A SECTION OF A PAPER WITH ITS TITLE AND CONTENT"""

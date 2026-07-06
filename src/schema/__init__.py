@@ -1,9 +1,13 @@
 from .api.health import healthResponse
-from .arxiv.paper import  PaperCreate, PaperResponse, PaperSearchResponse, ArxivPaper
+from .api.search import SearchHit, SearchRequest, SearchResponse
+from .arxiv.paper import ArxivPaper, PaperCreate, PaperResponse, PaperSearchResponse
 from .pdf_parser.models import PaperFigure, PaperSection, PaperTable, ParsedPaper, ParserType
 
 __all__ = [
     "HealthResponse",
+    "SearchRequest",
+    "SearchHit",
+    "SearchResponse",
     "ArxivPaper",
     "PaperCreate",
     "PaperResponse",

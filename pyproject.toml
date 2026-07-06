@@ -12,6 +12,7 @@ dependencies = [
     "httpx>=0.28.1",
     "ipykernel>=7.3.0",
     "opencv-python>=5.0.0.93",
+    "opensearch-py>=3.2.0",
     "polyfactory>=3.3.0",
     "psycopg2>=2.9.12",
     "pydantic-settings>=2.14.2",
