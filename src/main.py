@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI 
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import ask, paper, ping 
+from src.routers import ask, paper, ping , search
 import uvicorn
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.pdf_parser.factory import make_pdf_parser_service
+from src.services.opensearch.factory import make_opensearch_client
 # setup logging 
 logging.basicConfig(
     level = logging.INFO,
@@ -30,7 +31,25 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized.")
     app.state.arxiv_client = make_arxiv_client()
     app.state.pdf_parser = make_pdf_parser_service()
-    # app.state.opensearch_service = None  # Placeholder for OpenSearch service instance
+    opensearch_client = make_opensearch_client()
+    app.state.opensearch_client = opensearch_client
+
+    # verify Opensearch connectivity and create index if needed
+    if opensearch_client.create_index(force=False):
+        logger.info("OpenSearch index verified/created successfully.")
+        # Ensure index exists
+        if opensearch_client.create_index(force=False):
+            logger.info("OpenSearch index created")
+        else:
+            logger.info("OpenSearch index already exists")
+
+        # Get index statistics
+        stats = opensearch_client.get_index_stats()
+        logger.info(f"OpenSearch ready: {stats.get('document_count', 0)} documents indexed")
+    else:
+        logger.warning("OpenSearch connection failed - search features will be limited")
+
+        
     # app.state.LLM_service = None  # Placeholder for LLM service instance
     logger.info("API is ready")
 
@@ -51,6 +70,7 @@ app = FastAPI(
 app.include_router(ping.router, prefix="/api/v1")
 # app.include_router(ask.router)
 app.include_router(paper.router,prefix="/api/v1")
+app.include_router(search.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     
