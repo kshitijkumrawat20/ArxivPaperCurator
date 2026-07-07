@@ -40,7 +40,7 @@ class ArxivSettings(BaseConfigSettings):
     search_category: str= "cs.AI"  # Default search category for AI papers
     download_max_retries: int = 3
     download_retry_delay: float = 5.0  # Delay between retries in seconds
-    max_concurret_downloads: int = 5  # Maximum number of concurrent downloads
+    max_concurrent_downloads: int = 5  # Maximum number of concurrent downloads
     max_concurrent_parsing: int = 1  
 
     namespaces: dict = Field(
