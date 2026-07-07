@@ -6,6 +6,9 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session 
 from src.config import Settings
 from src.db.interfaces.base import BaseDatabase 
+from src.services.arxiv.client import ArxivClient 
+from src.services.opensearch.client import OpenSearchClient 
+from src.services.pdf_parser.parser import PDFParserService
 
 @lru_cache() # Cache the settings instance to avoid reloading it multiple times for example during dependency injection in FastAPI.
 def get_settings() -> Settings:
@@ -25,22 +28,22 @@ def get_db_session(database: BaseDatabase = Depends(get_database)) -> Generator[
     with database.get_session() as session: 
         yield session
 
-# def get_pdf_parser(request: Request):  # Replace 'Any' with the actual type of the PDF parser instance
-#     """Get the PDF parser instance from the request state."""
-#     return request.app.state.pdf_parser 
+def get_pdf_parser(request: Request) -> PDFParserService:
+    """Get the PDF parser instance from the request state."""
+    return request.app.state.pdf_parser 
 
-# def get_opensearch_service(request: Request): 
-#     """Get the OpenSearch service instance from the app state"""
-#     return getattr(request.app.state, "opensearch_service", None)  # Return None if the attribute does not exist
+def get_opensearch_client(request: Request) -> OpenSearchClient:
+    """Get the OpenSearch client instance from the app state"""
+    return request.app.state.opensearch_client
 
-# def get_LLM_service(request: Request): 
-#     """Get the LLM service instance from the app state"""
-#     return None 
+def get_arxiv_client(request: Request) -> ArxivClient:
+    """Get the ArXiv client instance from the app state"""
+    return request.app.state.arxiv_client
 
 # Dependency type aliases for better type hinting and readability
 SettingsDep = Annotated[Settings, Depends(get_request_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database )]
 SessionDep = Annotated[Session, Depends(get_db_session)]
-# PDFParserDep = Annotated[object, Depends(get_pdf_parser)]  # Replace 'object' with the actual type of the PDF parser instance
-# OpenSearchServiceDep = Annotated[object, Depends(get_opensearch_service)]  # Replace 'object' with the actual type of the OpenSearch service instance
-# LLMServiceDep = Annotated[object, Depends(get_LLM_service)]  # Replace 'object' with the actual type of the LLM service instance
+OpenSearchDep = Annotated[OpenSearchClient, Depends(get_opensearch_client)]
+ArxivDep = Annotated[ArxivClient, Depends(get_arxiv_client)]    
+PDFParserDep = Annotated[PDFParserService, Depends(get_pdf_parser)]

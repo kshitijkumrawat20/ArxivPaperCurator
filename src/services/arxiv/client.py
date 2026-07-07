@@ -22,7 +22,7 @@ class ArxivClient:
 
     @cached_property
     def pdf_cache_dir(self) -> Path: 
-        """PDF cache directory with lazy initialization."""
+        """PDF cache directory"""
         cache_dir = Path(self._settings.pdf_cache_dir)
         cache_dir.mkdir(parents=True, exist_ok = True)
         return cache_dir
@@ -368,7 +368,7 @@ class ArxivClient:
         return self.pdf_cache_dir / safe_filename
     
 
-    async def _download_with_retry(self, url: str, path: Path, max_retries: int = 3) -> bool:
+    async def _download_with_retry(self, url: str, path: Path, max_retries: Optional[int] = None) -> bool:
         """
         Download a file with retry logic.
 
@@ -380,6 +380,9 @@ class ArxivClient:
         Returns:
             True if successful, False otherwise
         """
+
+        if max_retries is None:
+            max_retries = self._settings.download_max_retries
         logger.info(f"Downloading PDF from {url}")
 
         # Respect rate limits
@@ -387,7 +390,7 @@ class ArxivClient:
 
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
                     async with client.stream("GET", url) as response:
                         response.raise_for_status()
                         with open(path, "wb") as f:
@@ -398,7 +401,7 @@ class ArxivClient:
 
             except httpx.TimeoutException as e:
                 if attempt < max_retries - 1:
-                    wait_time = 5 * (attempt + 1)
+                    wait_time = self._settings.download_retry_delay * (attempt + 1)  # Exponential backoff means that the wait time increases with each retry attempt. For example, if the base delay is 5 seconds, the first retry will wait for 5 seconds, the second retry will wait for 10 seconds, and so on.
                     logger.warning(f"PDF download timeout (attempt {attempt + 1}/{max_retries}): {e}")
                     logger.info(f"Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)

@@ -11,7 +11,7 @@ class OllamaClient:
 
     def __init__(self, settings: Settings):
         self.base_url = settings.ollama_host
-        self.timeout = httpx.Timeout(30.0)
+        self.timeout = httpx.Timeout(float(settings.ollama_timeout))
         
     async def health_check(self) -> Dict[str, str]:
         """Checking if ollama service is available and healthy"""

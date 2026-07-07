@@ -12,23 +12,22 @@ from src.schema.pdf_parser.models import PaperFigure, PaperTable, PaperSection, 
 logger = logging.getLogger(__name__)
 
 class DoclingParser: 
-    """Docling PDF parser for fallback when GOBID fails"""
+    """Docling PDF parser for scientific papers, optimized for arXiv PDFs. """
 
     def __init__(
             self, 
-            max_pages: int = 20, 
-            max_file_size_mb: int = 20, 
+            max_pages: int, 
+            max_file_size_mb: int, 
             do_ocr: bool = False, 
             do_tables_structure: bool = True
     ): 
         """
         Initialize DocumentConverter with optimized pipeline options.
 
-        Args:
-            max_pages: Maximum number of pages to process (default: 20)
-            max_file_size_mb: Maximum file size in MB (default: 20MB)
-            do_ocr: Enable OCR for scanned PDFs (default: False, very slow)
-            do_table_structure: Extract table structures (default: True)
+        :param max_pages: Maximum number of pages to process
+        :param max_file_size_mb: Maximum file size in MB
+        :param do_ocr: Enable OCR for scanned PDFs (default: False, very slow)
+        :param do_table_structure: Extract table structures (default: True)
         """
 
         # configure pipleline options 
@@ -59,11 +58,8 @@ class DoclingParser:
         """
         Comprehensive PDF validation including size and page limits.
 
-        Args:
-            pdf_path: Path to PDF file
-
-        Returns:
-            True if PDF appears valid and within limits, False otherwise
+        :param pdf_path: Path to PDF file
+        :returns: True if PDF appears valid and within limits, False otherwise
         """
         try: 
             # check if file exists and is not empty 
@@ -97,14 +93,11 @@ class DoclingParser:
     
     async def parse_pdf(self, pdf_path: Path) -> Optional[PdfContent]:
         """
-        Parse PDF using Docling as fallback parser.
+        Parse PDF using Docling parser.
         Limited to 20 pages to avoid memory issues with large papers.
 
-        Args:
-            pdf_path: Path to PDF file
-
-        Returns:
-            PdfContent object or None if parsing failed
+        :param pdf_path: Path to PDF file
+        :returns: PdfContent object or None if parsing failed
         """
 
         try: 
