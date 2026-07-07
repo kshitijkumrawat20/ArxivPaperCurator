@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from opensearchpy import OpenSearch 
 from opensearchpy.exceptions import NotFoundError, RequestError 
 from src.config import Settings, get_settings 
-from .index_config import ARXIV_PAPER_INDEX, ARXIV_PAPER_MAPPING
+from .index_config import ARXIV_PAPERS_INDEX, ARXIV_PAPERS_MAPPING
 from .query_builder import PaperQueryBuilder
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class OpenSearchClient:
 
         # use configured index name , fall back to constant if not set 
 
-        self.index_name = self.settings.opensearch.index_name or ARXIV_PAPER_INDEX
+        self.index_name = self.settings.opensearch.index_name or ARXIV_PAPERS_INDEX
         logger.info(f"OpenSearch client initialized with host: {host}")
 
     def create_index(self, force: bool = False) -> bool:
@@ -62,7 +62,7 @@ class OpenSearchClient:
                     return False
             # create index with mappings
 
-            response = self.client.indices.create(index=self.index_name, body=ARXIV_PAPER_MAPPING)
+            response = self.client.indices.create(index=self.index_name, body=ARXIV_PAPERS_MAPPING)
 
             if response.get("acknowledged"):
                 logger.info(f"Index {self.index_name} created successfully.")

@@ -138,7 +138,7 @@ def fetch_daily_papers(**context):
             run_paper_ingestion_pipeline(
                 target_date=target_date,
                 max_results=None,
-                process_pdfs=True,
+                process_pdf=True,
                 index_to_opensearch=False
             )
         )
@@ -263,7 +263,7 @@ def index_papers_to_opensearch(**context):
                         if hasattr(paper.published_date, "isoformat")
                         else str(paper.published_date),
                         "raw_text": paper.raw_text
-                        if hasattr(paper, "raw_text") and paper.raw_text
+                        if hasattr(paper, "raw_text") and paper.raw_text is not None
                         else "",  # Include PDF content
                         "created_at": paper.created_at.isoformat()
                         if hasattr(paper.created_at, "isoformat")
