@@ -75,8 +75,7 @@ async def run_paper_ingestion_pipeline(
             to_date = target_date,
             process_pdfs =process_pdf,
             store_to_db = True ,
-            db_session = session,
-            index_to_opensearch = index_to_opensearch
+            db_session = session
 
         ) 
 
