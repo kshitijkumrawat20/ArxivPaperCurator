@@ -471,13 +471,15 @@ def make_metadata_fetcher(
     if settings is None:
         settings = get_settings()
 
+    arxiv_settings = settings.arxiv
+
 
     return MetadataFetcher(
         arxiv_client=arxiv_client,
         pdf_parser=pdf_parser,
         opensearch_client=opensearch_client,
         pdf_cache_dir=pdf_cache_dir,
-        max_concurrent_downloads=settings.max_concurrent_downloads,
-        max_concurrent_parsing=settings.max_concurrent_parsing,
+        max_concurrent_downloads=arxiv_settings.max_concurrent_downloads,
+        max_concurrent_parsing=arxiv_settings.max_concurrent_parsing,
         settings=settings,
     )
