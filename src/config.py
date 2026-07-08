@@ -83,7 +83,7 @@ class OpenSearchSettings(BaseConfigSettings):
         case_sensitive=False,
     )
     host: str = "http://localhost:9200"
-    index_name: str = "arxiv_papers"
+    index_name: str = "arxiv-papers"
     max_text_size: int = 1000000
 class Settings(BaseConfigSettings):
     """Application settings."""
