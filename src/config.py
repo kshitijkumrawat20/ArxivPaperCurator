@@ -73,6 +73,19 @@ class PDFParserSettings(BaseConfigSettings):
     do_ocr: bool = False 
     do_tables_structure: bool = True 
 
+class ChunkingSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_file = [".env", str(ENV_FILE_PATH)],
+        env_prefix = "CHUNKING__",
+        extra = "ignore",
+        frozen = True,
+        case_sensitive = False,
+    )
+    chunk_size: int = 600
+    overlap_size: int = 100
+    min_chunk_size: int = 100
+    section_based : bool = True # Use section based chunking when availables    
+
 class OpenSearchSettings(BaseConfigSettings):
     """OpenSearch settings."""
     model_config = SettingsConfigDict(
@@ -84,7 +97,16 @@ class OpenSearchSettings(BaseConfigSettings):
     )
     host: str = "http://localhost:9200"
     index_name: str = "arxiv-papers"
+    chunk_index_suffix : str = "chunks" # create single hybrid index: {index_name}-{chunk_index_suffix}
     max_text_size: int = 1000000
+
+    # Vector search settings 
+    vector_dimension: int = 1024
+    vector_space_type: str = "cosinesimil" 
+
+    # Hybrid Search settings 
+    rrf_pipeline_name : str = "hybrid-rrf-pipeline" # RRf here is the reciprocal rank fusion pipeline name in OpenSearch
+    hybrid_search_size_multiplier: int = 3 # multiplier for the number of results to retrieve for hybrid search (e.g., if size=10 and multiplier=3, then 30 results will be retrieved)
 class Settings(BaseConfigSettings):
     """Application settings."""
     
@@ -104,11 +126,16 @@ class Settings(BaseConfigSettings):
     ollama_model: str = "llama3.2:1b"
     ollama_timeout : int = 300 # atleast 5 min 
 
+    # Jina Ai embedding configurations 
+    jina_api_key: str = "YOUR_JINA_API_KEY"
+
     # arXiv settings
     arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
 
     # PDF parser settings
     pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings) 
+
+    chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
 
     # OpenSearch settings
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
