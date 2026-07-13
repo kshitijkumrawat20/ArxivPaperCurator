@@ -9,22 +9,10 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker 
 from src.db.interfaces.base import BaseDatabase
-
+from src.schema.database.config import PostgresSQLSettings
 logger = logging.getLogger(__name__)
 
-class PostgresSQLSettings(BaseSettings):
-    """Settings for PostgreSQL database connection."""
 
-    database_url: str = Field(default = "postgresql://rag_user:rag_passward@localhost:5432/rag_db", description = "Database URL for PostgreSQL connection.")
-
-    echo_sql: bool = Field(default = False, description = "Flag to enable SQL query logging.")
-
-    pool_size: int = Field(default=0, description="The size of the database connection pool. Default is 0, which means no limit.")
-
-    max_overflow: int = Field(default=0, description="The maximum number of connections that can be created after the pool reaches its size limit. Default is 10.")
-
-    class Config: 
-        env_prefix = "POSTGRES_" # Prefix for environment variables related to PostgreSQL settings.
 
 Base = declarative_base() # Base class for SQLAlchemy models. means it will be used to define the structure of the database tables and their relationships.
 
