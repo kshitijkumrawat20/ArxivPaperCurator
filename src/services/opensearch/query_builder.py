@@ -2,10 +2,10 @@ import logging
 from typing import Any, Dict, List, Optional 
 logger = logging.getLogger(__name__)
 
-class PaperQueryBuilder: 
+class QueryBuilder: 
     """
     Query builder for arxiv papers search following refference pattern.
-    Build complex OpenSearch queries with proper scording, filtering and highlighting.
+    Unified query builder for Opesearch supporting both paper-level and chunk-level search.
     
     """
 
@@ -17,27 +17,34 @@ class PaperQueryBuilder:
             fields: Optional[List[str]] = None,
             categories: Optional[List[str]] = None,
             track_total_hits: bool = True,
-            latest_papers: bool = False
+            latest_papers: bool = False, 
+            search_chunks: bool = False,
     ):
         """Initialize query builder.
 
         :param query: Search query text
         :param size: Number of results to return
         :param from_: Offset for pagination
-        :param fields: Fields to search in
+        :param fields: Fields to search in (if None, auto-determined based on search_chunks)
         :param categories: Filter by categories
         :param track_total_hits: Whether to track total hits accurately
         :param latest_papers: Sort by publication date instead of relevance
+        :param search_chunks: Whether to search chunk-level data
         """
         self.query = query
         self.size = size
         self.from_ = from_
-        # Multi-field search with boosting: title (highest), abstract (medium), authors (lower)
-        self.fields = fields or ["title^3", "abstract^2", "authors^1"]
         self.categories = categories
         self.track_total_hits = track_total_hits
         self.latest_papers = latest_papers
-
+        self.search_chunks = search_chunks
+        if fields is None: 
+            if search_chunks: 
+                self.fields = ["chunk_text^3", "section_name^2", "title^1", "abstract^1", "authors^1"]
+            else:
+                self.fields = ["title^3", "abstract^2", "authors^1"]
+        else: 
+            self.fields = fields
 
     def build(self) -> Dict[str,Any]: 
         """
@@ -126,34 +133,65 @@ class PaperQueryBuilder:
             })
         return filters   
         
-    def _build_source_fields(self) -> List[str]:
+    def _build_source_fields(self) -> Any:
         """
         Specify which fields to return in the search results.
-        :return: List of fields to include in the response
-        """
-        return ["arxiv_id", "title", "authors", "abstract", "categories", "published_date", "pdf_url"]
-
+        :return: Source of fields configuration (list for papers, dict for chunsk ) """
+        if self.search_chunks:
+            return {
+                "excludes": ["embedding"]  # Exclude embedding field for chunk-level search
+            }
+        else: 
+            return ["arxiv_id", "title", "authors", "abstract", "categories", "published_date", "pdf_url"]
+    
     def _build_highlight(self) -> Dict[str, Any]:
         """Build highlighting configuration.
 
         :returns: Highlight configuration dictionary
         """
-        return {
-            "fields": {
-                "title": {
-                    "fragment_size": 0,  # Return entire field
-                    "number_of_fragments": 0,
+        if self.search_chunks:
+            return {
+                "fields": {
+                    "chunk_text": {
+                        "fragment_size": 150,
+                        "number_of_fragments": 2,
+                        "pre_tags": ["<mark>"],
+                        "post_tags": ["</mark>"],
+                    },
+                    "title": {"fragment_size": 0, "number_of_fragments": 0, "pre_tags": ["<mark>"], "post_tags": ["</mark>"]},
+                    "abstract": {
+                        "fragment_size": 150,
+                        "number_of_fragments": 1,
+                        "pre_tags": ["<mark>"],
+                        "post_tags": ["</mark>"],
+                    },
                 },
-                "abstract": {"fragment_size": 150, "number_of_fragments": 3, "pre_tags": ["<mark>"], "post_tags": ["</mark>"]},
-                "authors": {
-                    "fragment_size": 0,  # Return entire field
-                    "number_of_fragments": 0,
-                    "pre_tags": ["<mark>"],
-                    "post_tags": ["</mark>"],
+                "require_field_match": False,
+            }
+        else:
+            # Paper-specific highlighting
+            return {
+                "fields": {
+                    "title": {
+                        "fragment_size": 0,
+                        "number_of_fragments": 0,
+                    },
+                    "abstract": {
+                        "fragment_size": 150,
+                        "number_of_fragments": 3,
+                        "pre_tags": ["<mark>"],
+                        "post_tags": ["</mark>"],
+                    },
+                    "authors": {
+                        "fragment_size": 0,
+                        "number_of_fragments": 0,
+                        "pre_tags": ["<mark>"],
+                        "post_tags": ["</mark>"],
+                    },
                 },
-            },
-            "require_field_match": False,
-        }
+                "require_field_match": False,
+            }
+            
     
     def _build_sort(self) -> Optional[List[Dict[str, Any]]]:
         """Build sorting configuration.
@@ -171,22 +209,22 @@ class PaperQueryBuilder:
         # For empty queries, sort by publication date (newest first)
         return [{"published_date": {"order": "desc"}}, "_score"]
 
-    def build_search_query(
-        query: str,
-        size: int = 10,
-        from_: int = 0,
-        categories: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        """Helper function to build a search query with optional filters.
+    # def build_search_query(
+    #     query: str,
+    #     size: int = 10,
+    #     from_: int = 0,
+    #     categories: Optional[List[str]] = None,
+    # ) -> Dict[str, Any]:
+    #     """Helper function to build a search query with optional filters.
 
-        :param query: Search query text
-        :param size: Number of results
-        :param from_: Offset for pagination
-        :param categories: Optional filter by categories
-        :returns: Search query dictionary
-        """
-        builder = PaperQueryBuilder(query=query, size=size, from_=from_, categories=categories)
-        return builder.build()
+    #     :param query: Search query text
+    #     :param size: Number of results
+    #     :param from_: Offset for pagination
+    #     :param categories: Optional filter by categories
+    #     :returns: Search query dictionary
+    #     """
+    #     builder = QueryBuilder(query=query, size=size, from_=from_, categories=categories)
+    #     return builder.build()
 
 
 # # writing a test function to test the query builder

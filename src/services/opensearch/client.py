@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from opensearchpy import OpenSearch 
 from opensearchpy.exceptions import NotFoundError, RequestError 
 from src.config import Settings, get_settings 
-from .index_config import ARXIV_PAPERS_INDEX, ARXIV_PAPERS_MAPPING
+from .index_config_hybrid import ARXIV_PAPERS_INDEX, ARXIV_PAPERS_MAPPING
 from .query_builder import PaperQueryBuilder
 
 logger = logging.getLogger(__name__)
