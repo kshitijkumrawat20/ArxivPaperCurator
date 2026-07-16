@@ -26,7 +26,7 @@ class MetadataFetcher:
         self,
         arxiv_client: ArxivClient,
         pdf_parser: PDFParserService,
-        opensearch_client: Optional[OpenSearchClient] = None,
+        # opensearch_client: Optional[OpenSearchClient] = None,
         pdf_cache_dir: Optional[Path] = None,
         max_concurrent_downloads: int = 5,
         max_concurrent_parsing: int = 3,
@@ -34,7 +34,7 @@ class MetadataFetcher:
     ):
         self.arxiv_client = arxiv_client
         self.pdf_parser = pdf_parser
-        self.opensearch_client = opensearch_client
+        # self.opensearch_client = opensearch_client
         self.pdf_cache_dir = pdf_cache_dir or self.arxiv_client.pdf_cache_dir
         self.max_concurrent_downloads = max_concurrent_downloads
         self.max_concurrent_parsing = max_concurrent_parsing
@@ -48,7 +48,7 @@ class MetadataFetcher:
         process_pdfs: bool = True,
         store_to_db: bool = True,
         db_session: Optional[Session] = None,
-        index_to_opensearch: bool = False,
+        # index_to_opensearch: bool = False,
     ) -> Dict[str, Any]:
         """
         Fetch papers from arXiv, process PDFs, and store to database.
@@ -59,14 +59,12 @@ class MetadataFetcher:
         :param process_pdfs: Whether to download and parse PDFs
         :param store_to_db: Whether to store results in database
         :param db_session: Database session (required if store_to_db=True)
-        :param index_to_opensearch: Whether to index papers in OpenSearch
         :type max_results: Optional[int]
         :type from_date: Optional[str]
         :type to_date: Optional[str]
         :type process_pdfs: bool
         :type store_to_db: bool
         :type db_session: Optional[Session]
-        :type index_to_opensearch: bool
         :returns: Dictionary with processing results and statistics
         :rtype: Dict[str, Any]
         """
@@ -112,14 +110,14 @@ class MetadataFetcher:
                 logger.warning("Database storage requested but no session provided")
                 results["errors"].append("Database session not provided for storage")
 
-            # Step 4: Index in OpenSearch if requested
-            if index_to_opensearch and self.opensearch_client:
-                logger.info("Step 4: Indexing papers in OpenSearch...")
-                indexed_count = await self._index_papers_to_opensearch(papers, pdf_results.get("parsed_papers", {}))
-                results["papers_indexed"] = indexed_count
-            elif index_to_opensearch and not self.opensearch_client:
-                logger.warning("OpenSearch indexing requested but no client provided")
-                results["errors"].append("OpenSearch client not provided for indexing")
+            # # Step 4: Index in OpenSearch if requested
+            # if index_to_opensearch and self.opensearch_client:
+            #     logger.info("Step 4: Indexing papers in OpenSearch...")
+            #     indexed_count = await self._index_papers_to_opensearch(papers, pdf_results.get("parsed_papers", {}))
+            #     results["papers_indexed"] = indexed_count
+            # elif index_to_opensearch and not self.opensearch_client:
+            #     logger.warning("OpenSearch indexing requested but no client provided")
+            #     results["errors"].append("OpenSearch client not provided for indexing")
             # Calculate total processing time
             processing_time = (datetime.now() - start_time).total_seconds()
             results["processing_time"] = processing_time
@@ -190,8 +188,18 @@ class MetadataFetcher:
                 logger.error(error_msg)
                 results["errors"].append(error_msg)
             elif result:
-                # Result is tuple: (download_success, parsed_paper)
-                download_success, parsed_paper = result
+                # # Result is tuple: (download_success, parsed_paper)
+                # download_success, parsed_paper = result
+                # check if resuylt is tuple before unpacking 
+                # handle AirflowTaskTerminated and other non-tuple results 
+                if isinstance(result, tuple) and len(result) == 2:
+                    download_success, parsed_paper = result
+                else:
+                    # result is not tuple could be airflowTaskTermainal or other error 
+                    error_msg = f"Pipeline error for {paper.arxiv_id}: Unexpected result type {type(result)}"
+                    logger.error(error_msg)
+                    results["errors"].append(error_msg)
+                    continue
 
                 if download_success:
                     results["downloaded"] += 1
@@ -389,66 +397,66 @@ class MetadataFetcher:
 
         return stored_count
     
-    def _index_papers_to_opensearch(
-        self,
-        papers: List[ArxivPaper],
-        parsed_papers: Dict[str, ParsedPaper],
-    ) -> int:
-        """
-        Index papers to OpenSearch for full-text search.
+    # def _index_papers_to_opensearch(
+    #     self,
+    #     papers: List[ArxivPaper],
+    #     parsed_papers: Dict[str, ParsedPaper],
+    # ) -> int:
+    #     """
+    #     Index papers to OpenSearch for full-text search.
 
-        Args:
-            papers: List of ArxivPaper metadata
-            parsed_papers: Dictionary of parsed PDF content by arxiv_id
+    #     Args:
+    #         papers: List of ArxivPaper metadata
+    #         parsed_papers: Dictionary of parsed PDF content by arxiv_id
 
-        Returns:
-            Number of papers successfully indexed
-        """
-        indexed_count = 0
+    #     Returns:
+    #         Number of papers successfully indexed
+    #     """
+    #     indexed_count = 0
 
-        for paper in papers:
-            try:
-                # Get parsed content if available
-                parsed_paper = parsed_papers.get(paper.arxiv_id)
+    #     for paper in papers:
+    #         try:
+    #             # Get parsed content if available
+    #             parsed_paper = parsed_papers.get(paper.arxiv_id)
 
-                # Prepare data for OpenSearch
-                opensearch_data = {
-                    "arxiv_id": paper.arxiv_id,
-                    "title": paper.title,
-                    "authors": paper.authors if isinstance(paper.authors, str) else ", ".join(paper.authors),
-                    "abstract": paper.abstract,
-                    "categories": paper.categories,
-                    "pdf_url": paper.pdf_url,
-                    "published_date": paper.published_date.isoformat()
-                    if hasattr(paper.published_date, "isoformat")
-                    else str(paper.published_date),
-                }
+    #             # Prepare data for OpenSearch
+    #             opensearch_data = {
+    #                 "arxiv_id": paper.arxiv_id,
+    #                 "title": paper.title,
+    #                 "authors": paper.authors if isinstance(paper.authors, str) else ", ".join(paper.authors),
+    #                 "abstract": paper.abstract,
+    #                 "categories": paper.categories,
+    #                 "pdf_url": paper.pdf_url,
+    #                 "published_date": paper.published_date.isoformat()
+    #                 if hasattr(paper.published_date, "isoformat")
+    #                 else str(paper.published_date),
+    #             }
 
-                # Add parsed content if available
-                if parsed_paper and parsed_paper.pdf_content:
-                    max_text_size = self.settings.opensearch.max_text_size
-                    opensearch_data["raw_text"] = parsed_paper.pdf_content.raw_text[:max_text_size]
-                else:
-                    opensearch_data["raw_text"] = ""
+    #             # Add parsed content if available
+    #             if parsed_paper and parsed_paper.pdf_content:
+    #                 max_text_size = self.settings.opensearch.max_text_size
+    #                 opensearch_data["raw_text"] = parsed_paper.pdf_content.raw_text[:max_text_size]
+    #             else:
+    #                 opensearch_data["raw_text"] = ""
 
-                # Index to OpenSearch
-                if self.opensearch_client.index_paper(opensearch_data):
-                    indexed_count += 1
-                    logger.debug(f"Indexed paper {paper.arxiv_id} to OpenSearch")
-                else:
-                    logger.warning(f"Failed to index paper {paper.arxiv_id} to OpenSearch")
+    #             # Index to OpenSearch
+    #             if self.opensearch_client.index_paper(opensearch_data):
+    #                 indexed_count += 1
+    #                 logger.debug(f"Indexed paper {paper.arxiv_id} to OpenSearch")
+    #             else:
+    #                 logger.warning(f"Failed to index paper {paper.arxiv_id} to OpenSearch")
 
-            except Exception as e:
-                logger.error(f"Error indexing paper {paper.arxiv_id} to OpenSearch: {e}")
+    #         except Exception as e:
+    #             logger.error(f"Error indexing paper {paper.arxiv_id} to OpenSearch: {e}")
 
-        logger.info(f"Indexed {indexed_count}/{len(papers)} papers to OpenSearch")
-        return indexed_count
+    #     logger.info(f"Indexed {indexed_count}/{len(papers)} papers to OpenSearch")
+    #     return indexed_count
 
 
 def make_metadata_fetcher(
     arxiv_client: ArxivClient,
     pdf_parser: PDFParserService,
-    opensearch_client: Optional[OpenSearchClient] = None,
+    # opensearch_client: Optional[OpenSearchClient] = None,
     pdf_cache_dir: Optional[Path] = None,
     settings: Optional[Settings] = None,
 ) -> MetadataFetcher:
@@ -456,12 +464,10 @@ def make_metadata_fetcher(
 
     :param arxiv_client: Client for arXiv API operations
     :param pdf_parser: Service for parsing PDF documents
-    :param opensearch_client: Optional OpenSearch client for indexing
     :param pdf_cache_dir: Directory for caching downloaded PDFs
     :param settings: Application settings instance (uses default if None)
     :type arxiv_client: ArxivClient
     :type pdf_parser: PDFParserService
-    :type opensearch_client: Optional[OpenSearchClient]
     :type pdf_cache_dir: Optional[Path]
     :type settings: Optional[Settings]
     :returns: Configured MetadataFetcher instance
@@ -477,7 +483,7 @@ def make_metadata_fetcher(
     return MetadataFetcher(
         arxiv_client=arxiv_client,
         pdf_parser=pdf_parser,
-        opensearch_client=opensearch_client,
+        # opensearch_client=opensearch_client,
         pdf_cache_dir=pdf_cache_dir,
         max_concurrent_downloads=arxiv_settings.max_concurrent_downloads,
         max_concurrent_parsing=arxiv_settings.max_concurrent_parsing,
