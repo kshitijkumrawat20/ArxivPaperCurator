@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Dict, List, Optional, Union
 
-from src.schemas.indexing.models import ChunkMetadata, TextChunk
+from src.schema.indexing.models import ChunkMetadata, TextChunk
 
 logger = logging.getLogger(__name__)
 
