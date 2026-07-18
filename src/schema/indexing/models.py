@@ -7,8 +7,8 @@ class ChunkMetadata(BaseModel):
     start_char: int 
     end_char: int 
     word_count: int 
-    overalp_with_previous_chunk: int 
-    overlap_with_next: int 
+    overlap_with_previous_chunk: int 
+    overlap_with_next_chunk: int 
     section_title: Optional[str] = None
 
 class TextChunk(BaseModel):
