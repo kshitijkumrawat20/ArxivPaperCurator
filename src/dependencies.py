@@ -10,6 +10,7 @@ from src.services.arxiv.client import ArxivClient
 from src.services.embeddings.jina_client import JinaEmbeddingsClient
 from src.services.opensearch.client import OpenSearchClient 
 from src.services.pdf_parser.parser import PDFParserService
+from src.services.ollama.client import OllamaClient
 
 @lru_cache() # Cache the settings instance to avoid reloading it multiple times for example during dependency injection in FastAPI.
 def get_settings() -> Settings:
@@ -46,6 +47,10 @@ def get_arxiv_client(request: Request) -> ArxivClient:
     """Get the ArXiv client instance from the app state"""
     return request.app.state.arxiv_client
 
+def get_ollama_client(request: Request) -> OllamaClient:
+    """Get the Ollama client instance from the app state"""
+    return request.app.state.ollama_client
+
 # Dependency type aliases for better type hinting and readability
 SettingsDep = Annotated[Settings, Depends(get_request_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database )]
@@ -54,3 +59,4 @@ OpenSearchDep = Annotated[OpenSearchClient, Depends(get_opensearch_client)]
 ArxivDep = Annotated[ArxivClient, Depends(get_arxiv_client)]    
 PDFParserDep = Annotated[PDFParserService, Depends(get_pdf_parser)]
 EmbeddingsDep = Annotated[JinaEmbeddingsClient, Depends(get_embeddings_service)]
+OllamaDep = Annotated[OllamaClient, Depends(get_ollama_client)]
