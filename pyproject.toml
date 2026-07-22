@@ -9,6 +9,7 @@ dependencies = [
     "asgi-lifespan>=2.1.0",
     "docling>=2.108.0",
     "fastapi>=0.138.0",
+    "gradio>=6.20.0",
     "httpx>=0.28.1",
     "ipykernel>=7.3.0",
     "opencv-python>=5.0.0.93",
