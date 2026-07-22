@@ -9,10 +9,10 @@ from sqlalchemy import text
 from ..exception import OllamaConnectionError, OllamaException, OllamaTimeoutError
 router = APIRouter()
 
-@router.get("/ping", tags=["Health Check"])
-async def ping():
-    """Simple health check endpoint to verify that the service is running."""
-    return {"status": "ok", "message": "pong"}
+# @router.get("/ping", tags=["Health Check"])
+# async def ping():
+#     """Simple health check endpoint to verify that the service is running."""
+#     return {"status": "ok", "message": "pong"}
 
 @router.get("/health", response_model=healthResponse, tags=["Health Check"])
 async def health_check(settings: SettingsDep, database: DatabaseDep, opensearch_client: OpenSearchDep) -> healthResponse:

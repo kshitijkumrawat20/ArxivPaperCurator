@@ -144,7 +144,9 @@ async def ask_question_stream(
     embeddings_service: EmbeddingsDep,
     ollama_client: OllamaDep,
 ) -> StreamingResponse:
-    """Streaming RAG endpoint - returns answer as it's generated."""
+    """
+    Streaming RAG endpoint - returns answer as it's generated.
+     """
 
     async def generate_stream():
         try:

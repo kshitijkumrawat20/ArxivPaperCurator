@@ -6,7 +6,8 @@ import uvicorn
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import hybrid_search, paper, ping
+from src.routers import hybrid_search, ping
+from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.embeddings.factory import make_embeddings_service
 from src.services.opensearch.factory import make_opensearch_client
