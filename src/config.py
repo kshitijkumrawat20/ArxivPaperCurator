@@ -107,6 +107,44 @@ class OpenSearchSettings(BaseConfigSettings):
     # Hybrid Search settings 
     rrf_pipeline_name : str = "hybrid-rrf-pipeline" # RRf here is the reciprocal rank fusion pipeline name in OpenSearch
     hybrid_search_size_multiplier: int = 3 # multiplier for the number of results to retrieve for hybrid search (e.g., if size=10 and multiplier=3, then 30 results will be retrieved)
+
+class LangfuseSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_file=[".env", str(ENV_FILE_PATH)],env_prefix="LANGFUSE__",
+        extra="ignore",
+        frozen=True,
+        case_sensitive=False,      
+    )
+    public_key: str = ""
+    secret_key: str = ""
+    host: str = "https://localhost:3000"
+    enabled: bool = True
+    flush_at: int = 15 # Number of events before flusing to Langfuse 
+    flush_interval: float= 1.0 # seconds between flushes to Langfuse
+    max_retries: int = 3 
+    timeout : int = 30
+    debug: bool = False
+
+class RedisSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_file=[".env", str(ENV_FILE_PATH)],
+        env_prefix="REDIS__",
+        extra="ignore",
+        frozen=True,
+        case_sensitive=False,
+    )
+    host: str = "localhost"
+    port: int = 6379
+    password: str = ""
+    db: int = 0
+    decode_responses: bool = True
+    socket_timeout: int = 30
+    socket_connect_timeout: int = 30
+
+    # cache settings
+    ttl_hours: int = 6 # cache TTL in hours
+
+
 class Settings(BaseConfigSettings):
     """Application settings."""
     
@@ -140,6 +178,12 @@ class Settings(BaseConfigSettings):
     # OpenSearch settings
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
 
+    # Langfuse settings
+    langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
+    # Redis settings
+    redis: RedisSettings = Field(default_factory=RedisSettings)
+
+
     @field_validator("postgres_database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
@@ -158,6 +202,3 @@ class Settings(BaseConfigSettings):
 def get_settings() -> Settings:
     """Get the application settings class instance."""
     return Settings()
-
-
-#
