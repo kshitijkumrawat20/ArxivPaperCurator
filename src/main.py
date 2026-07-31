@@ -13,6 +13,9 @@ from src.services.embeddings.factory import make_embeddings_service
 from src.services.opensearch.factory import make_opensearch_client
 from src.services.ollama.factory import make_ollama_client
 from src.services.pdf_parser.factory import make_pdf_parser_service
+from src.services.cache.factory import make_cache_client 
+from src.services.langfuse.factory import make_langfuse_tracer
+
 
 # Setup logging
 logging.basicConfig(
@@ -65,7 +68,9 @@ async def lifespan(app: FastAPI):
     app.state.pdf_parser = make_pdf_parser_service()
     app.state.embeddings_service = make_embeddings_service()
     app.state.ollama_client = make_ollama_client()
-    logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Ollama")
+    app.state.langfuse_tracer = make_langfuse_tracer(settings)
+    app.state.cache_client = make_cache_client(settings)  # Initialize cache client
+    logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Ollama, langfuse, Cache")
 
     logger.info("API ready")
     yield

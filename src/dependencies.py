@@ -11,7 +11,8 @@ from src.services.embeddings.jina_client import JinaEmbeddingsClient
 from src.services.opensearch.client import OpenSearchClient 
 from src.services.pdf_parser.parser import PDFParserService
 from src.services.ollama.client import OllamaClient
-
+from src.services.cache.client import CacheClient 
+from src.services.langfuse.client import LangfuseTracer
 @lru_cache() # Cache the settings instance to avoid reloading it multiple times for example during dependency injection in FastAPI.
 def get_settings() -> Settings:
     """Get the application settings."""
@@ -51,6 +52,15 @@ def get_ollama_client(request: Request) -> OllamaClient:
     """Get the Ollama client instance from the app state"""
     return request.app.state.ollama_client
 
+def get_langfuse_tracer(request: Request) -> LangfuseTracer:
+    """Get Langfuse tracer from the request state."""
+    return request.app.state.langfuse_tracer
+
+
+def get_cache_client(request: Request) -> CacheClient | None:
+    """Get cache client from the request state."""
+    return getattr(request.app.state, "cache_client", None)
+
 # Dependency type aliases for better type hinting and readability
 SettingsDep = Annotated[Settings, Depends(get_request_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database )]
@@ -60,3 +70,5 @@ ArxivDep = Annotated[ArxivClient, Depends(get_arxiv_client)]
 PDFParserDep = Annotated[PDFParserService, Depends(get_pdf_parser)]
 EmbeddingsDep = Annotated[JinaEmbeddingsClient, Depends(get_embeddings_service)]
 OllamaDep = Annotated[OllamaClient, Depends(get_ollama_client)]
+LangfuseDep = Annotated[LangfuseTracer, Depends(get_langfuse_tracer)]
+CacheDep = Annotated[CacheClient | None, Depends(get_cache_client)]
