@@ -1,10 +1,12 @@
 import json
 import logging
-
+import time 
+from typing import Dict, List
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from src.dependencies import EmbeddingsDep, OllamaDep, OpenSearchDep
+from src.dependencies import EmbeddingsDep, OllamaDep, OpenSearchDep, CacheDep, LangfuseDep
 from src.schema.api.ask import AskRequest, AskResponse
+from src.services.langfuse.tracer import RAGTracer
 
 logger = logging.getLogger(__name__)
 
@@ -17,21 +19,25 @@ async def _prepare_chunks_and_sources(
     request: AskRequest,
     opensearch_client,
     embeddings_service,
-):
-    """Shared function to prepare chunks and sources for RAG."""
+    rag_tracer: RAGTracer, 
+    trace = None,
+) -> tuple[List[Dict], List[str],List[str]]:
+    """Retrieve and prepare for RAG with clean tracing ."""
     # Generate query embedding for hybrid search if enabled
     query_embedding = None
-    search_mode = "bm25"
+    # search_mode = "bm25"
+
 
     if request.use_hybrid:
-        try:
-            query_embedding = await embeddings_service.embed_query(request.query)
-            search_mode = "hybrid"
-            logger.info("Generated query embedding for hybrid search")
-        except Exception as e:
-            logger.warning(f"Failed to generate embeddings, falling back to BM25: {e}")
-            query_embedding = None
-            search_mode = "bm25"
+        with rag_tracer.trace_embedding(trace,request.query) as embedding_span: 
+            try:
+                query_embedding = await embeddings_service.embed_query(request.query)
+                # search_mode = "hybrid"
+                logger.info("Generated query embedding for hybrid search")
+            except Exception as e:
+                logger.warning(f"Failed to generate embeddings, falling back to BM25: {e}")
+                query_embedding = None
+                search_mode = "bm25"
 
     # Retrieve top-k chunks
     logger.info(f"Retrieving top {request.top_k} chunks for query: '{request.query}'")
