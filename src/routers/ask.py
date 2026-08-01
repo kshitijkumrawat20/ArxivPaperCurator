@@ -141,30 +141,34 @@ async def ask_question(
 
             # Generate answer 
             with rag_tracer.trace_generation(trace, request.model, final_prompt) as gen_span: 
-                rag_response = await ollama_client.generate_rag_answer(query = request)
+                rag_response = await ollama_client.generate_rag_answer(query = request.query,chunks=chunks, model = request.model)
+                answer = rag_response.get("answer", "Unable to generate answer")
+                rag_tracer.end_generation(gen_span, answer, request.model)
 
-        # Generate answer using LLM
-        rag_response = await ollama_client.generate_rag_answer(query=request.query, chunks=chunks, model=request.model)
+        
 
-        logger.debug(f"RAG response: {rag_response}")
+            logger.debug(f"RAG response: {rag_response}")
 
-        # Prepare response using pre-built sources
-        response = AskResponse(
-            query=request.query,
-            answer=rag_response.get("answer", "Unable to generate answer"),
-            sources=sources,  # Use sources from search results
-            chunks_used=len(chunks),
-            search_mode=search_mode,
-        )
+            # Prepare response using pre-built sources
+            response = AskResponse(
+                query=request.query,
+                answer=answer,
+                sources=sources,  # Use sources from search results
+                chunks_used=len(chunks),
+                search_mode="bm25" if not request.user_hybrid else "hybrid",
+            )
+            rag_tracer.end_request(trace, answer, time.time() - start_time)
 
-        logger.info(f"Successfully generated answer for query: '{request.query}'")
-        return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in ask endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process question: {str(e)}")
+            # store response in exact match cache 
+            if cache_client: 
+                try: 
+                    await cache_client.store_response(request, response)
+                except Exception as e:
+                    logger.warning(f"Failed to store response in cache: {e}")
+            return response
+        except Exception as e:
+            logger.error(f"Error in ask endpoint: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to process question: {str(e)}")
 
 
 @stream_router.post("/stream")
@@ -173,6 +177,9 @@ async def ask_question_stream(
     opensearch_client: OpenSearchDep,
     embeddings_service: EmbeddingsDep,
     ollama_client: OllamaDep,
+    langfuse_tracer: LangfuseDep,
+    cache_client: CacheDep,
+
 ) -> StreamingResponse:
     """
     Streaming RAG endpoint - returns answer as it's generated.
