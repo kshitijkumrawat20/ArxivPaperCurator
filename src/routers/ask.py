@@ -4,6 +4,7 @@ import time
 from typing import Dict, List
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic_settings import sources
 from src.dependencies import EmbeddingsDep, OllamaDep, OpenSearchDep, CacheDep, LangfuseDep
 from src.schema.api.ask import AskRequest, AskResponse
 from src.services.langfuse.tracer import RAGTracer
@@ -36,46 +37,52 @@ async def _prepare_chunks_and_sources(
                 logger.info("Generated query embedding for hybrid search")
             except Exception as e:
                 logger.warning(f"Failed to generate embeddings, falling back to BM25: {e}")
-                query_embedding = None
-                search_mode = "bm25"
+                if embedding_span: 
+                    rag_tracer.tracer.update_span(embedding_span, output ={"success":False, "error": str(e)})
+                # query_embedding = None
+                # search_mode = "bm25"
 
     # Retrieve top-k chunks
-    logger.info(f"Retrieving top {request.top_k} chunks for query: '{request.query}'")
+    # logger.info(f"Retrieving top {request.top_k} chunks for query: '{request.query}'")
+    # Search with tracing 
+    with rag_tracer.trace_search(trace, request.query, request.top_k) as search_span:
+        search_results = opensearch_client.search_unified(
+            query=request.query,
+            query_embedding=query_embedding,
+            size=request.top_k,
+            from_=0,
+            categories=request.categories,
+            use_hybrid=request.use_hybrid and query_embedding is not None,
+            min_score=0.0,
+        )
 
-    search_results = opensearch_client.search_unified(
-        query=request.query,
-        query_embedding=query_embedding,
-        size=request.top_k,
-        from_=0,
-        categories=request.categories,
-        use_hybrid=request.use_hybrid and query_embedding is not None,
-        min_score=0.0,
-    )
+        # Extract chunks with minimal data for LLM
+        chunks = []
+        arxiv_ids = []
+        sources_set = set()  # Use set to automatically handle duplicates
 
-    # Extract chunks with minimal data for LLM
-    chunks = []
-    sources_set = set()  # Use set to automatically handle duplicates
+        for hit in search_results.get("hits", []):
+            arxiv_id = hit.get("arxiv_id", "")
 
-    for hit in search_results.get("hits", []):
-        arxiv_id = hit.get("arxiv_id", "")
-
-        # Build minimal chunk for LLM (only content + arxiv_id)
-        chunk_data = {
-            "arxiv_id": arxiv_id,
-            "chunk_text": hit.get("chunk_text", hit.get("abstract", "")),
-        }
-        chunks.append(chunk_data)
+            # Build minimal chunk for LLM (only content + arxiv_id)
+            chunks.append(
+                {
+                    "arxiv_id": arxiv_id,
+                    "chunk_text": hit.get("chunk_text", hit.get("abstract", "")),  # Fallback to abstract if chunk_text is missing
+                }
+            )
 
         # Build PDF URL from arxiv_id for sources (automatically deduplicates)
-        if arxiv_id:
-            arxiv_id_clean = arxiv_id.split("v")[0] if "v" in arxiv_id else arxiv_id
-            pdf_url = f"https://arxiv.org/pdf/{arxiv_id_clean}.pdf"
-            sources_set.add(pdf_url)
+            if arxiv_id:
+                arxiv_ids.append(arxiv_id)
+                arxiv_id_clean = arxiv_id.split("v")[0] if "v" in arxiv_id else arxiv_id
+                sources_set.add(f"https://arxiv.org/pdf/{arxiv_id_clean}.pdf")
 
     # Convert set back to list for consistent return type
-    sources = list(sources_set)
+    # sources = list(sources_set)
+        rag_tracer.end_search(search_span, chunks, arxiv_ids, search_results.get("total",0))
 
-    return chunks, sources, search_mode
+    return chunks, list(sources_set), arxiv_ids
 
 
 @ask_router.post("/ask", response_model=AskResponse)
@@ -84,40 +91,57 @@ async def ask_question(
     opensearch_client: OpenSearchDep,
     embeddings_service: EmbeddingsDep,
     ollama_client: OllamaDep,
+    langfuse_tracer: LangfuseDep,
+    cache_client: CacheDep,
 ) -> AskResponse:
     """
-    RAG endpoint for question answering.
-
-    1. Retrieves top-k chunks using hybrid search
-    2. Passes chunks to LLM with prompt template
-    3. Returns structured answer with sources
+    Clean RAG endpoint with essential tracing and exact match caching.
     """
-    try:
-        # Check service availability
-        if not opensearch_client.health_check():
-            raise HTTPException(status_code=503, detail="Search service is currently unavailable")
+    rag_tracer = RAGTracer(langfuse_tracer)
+    start_time = time.time()
+    with rag_tracer.trace_request("api_user", request.query) as trace:
+        try: 
+            # check exact cache first 
+            cached_response = None
+            if cache_client:
+                try: 
+                    cached_response = cache_client.find_cached_response(request)
+                    if cached_response: 
+                        logger.info(f"Returning  cached response for exact query match")
+                        return cached_response
+                except Exception as e:
+                    logger.warning(f"Cache check failed, proceeding with normal processing: {e}")
+            # generate query embedding for hybrid search if needed 
+            query_embedding = None
+            # retrive chunks 
+            chunks, sources, _ = await _prepare_chunks_and_sources(request, opensearch_client, embeddings_service, rag_tracer, trace)
+            if not chunks:
+                logger.warning(f"No chunks found for query: {request.query}")
+                response =  AskResponse(
+                    query=request.query,
+                    answer="I couldn't find any relevant information in the papers to answer your question.",
+                    sources=[],
+                    chunks_used=0,
+                    search_mode="bm25" if not request.use_hybrid else "hybrid",
+                )
+                rag_tracer.end_request(trace, response.answer, time.time()-start_time)
+                return response
 
-        # Check Ollama service
-        try:
-            await ollama_client.health_check()
-        except Exception as e:
-            logger.error(f"Ollama service unavailable: {e}")
-            raise HTTPException(status_code=503, detail="LLM service is currently unavailable")
+            # build prompt 
+            with rag_tracer.trace_prompt_construction(trace, chunks) as prompt_span: 
+                from src.services.ollama.prompts import RAGPromptBuilder
+                prompt_builder = RAGPromptBuilder()
 
-        # Prepare chunks and sources using shared function
-        chunks, sources, search_mode = await _prepare_chunks_and_sources(request, opensearch_client, embeddings_service)
+                try:
+                    prompt_data = prompt_builder.create_structured_prompt(request.query, chunks)
+                    final_prompt = prompt_data["prompt"]
+                except Exception:
+                    final_prompt = prompt_builder.create_rag_prompt(request.query, chunks)
+                rag_tracer.end_prompt(prompt_span, final_prompt)
 
-        if not chunks:
-            logger.warning(f"No chunks found for query: {request.query}")
-            return AskResponse(
-                query=request.query,
-                answer="I couldn't find any relevant information in the papers to answer your question.",
-                sources=[],
-                chunks_used=0,
-                search_mode=search_mode,
-            )
-
-        logger.info(f"Retrieved {len(chunks)} chunks, generating answer with {request.model}")
+            # Generate answer 
+            with rag_tracer.trace_generation(trace, request.model, final_prompt) as gen_span: 
+                rag_response = await ollama_client.generate_rag_answer(query = request)
 
         # Generate answer using LLM
         rag_response = await ollama_client.generate_rag_answer(query=request.query, chunks=chunks, model=request.model)
