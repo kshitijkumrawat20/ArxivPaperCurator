@@ -21,7 +21,7 @@ class HybridSearchRequest(BaseModel):
     min_score: float = Field(0.0, description= "Minimum score threshold for filtering results (default: 0.0)", ge = 0.0)
 
     class Config: 
-        allow_population_by_field_name = True  # Allow population of model using field names, even if they have aliases. This is useful for fields like 'from_' which have an alias 'from' but can still be populated using 'from_'.
+        populate_by_name = True  # Allow population of model using field names, even if they have aliases. This is useful for fields like 'from_' which have an alias 'from' but can still be populated using 'from_'.
         json_schema_extra = {
             "example": {
                 "query": "machine learning",
@@ -60,4 +60,4 @@ class SearchResponse(BaseModel):
     error: Optional[str] = None
 
     class Config:
-        allow_population_by_field_name = True  
+        populate_by_name = True  
