@@ -80,7 +80,6 @@ def test_search_response_creation():
             score=1.0,
         )
     ]
-
     response = SearchResponse(query="test query", total=1, hits=hits, size=10, **{"from": 0})
 
     assert response.query == "test query"
