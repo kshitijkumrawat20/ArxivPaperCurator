@@ -5,14 +5,12 @@ services:
     container_name: rag-api
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     depends_on:
       postgres:
         condition: service_healthy
       opensearch:
         condition: service_healthy
-      redis: 
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')\""]
@@ -20,19 +18,21 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    env_file:
+      - .env
     environment:
-      # Container-specific overrides (for inter-service communication)
+      # Container-specific overrides
+      - OPENSEARCH_HOST=http://opensearch:9200
       - OPENSEARCH__HOST=http://opensearch:9200
-      - OPENSEARCH__INDEX_NAME=arxiv-papers
       - OLLAMA_HOST=http://ollama:11434
       - POSTGRES_DATABASE_URL=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
-      - ENVIRONMENT=development
       - LANGFUSE__HOST=http://langfuse:3000
       - REDIS__HOST=redis
-    networks: 
-      -rag-network 
-  redis: 
-    image: redis:7-alpine 
+    networks:
+      - rag-network
+
+  redis:
+    image: redis:7-alpine
     container_name: rag-redis
     ports:
       - "6379:6379"
@@ -41,8 +41,8 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 3s
       retries: 3
       start_period: 10s
     restart: unless-stopped
@@ -96,7 +96,7 @@ services:
       - rag-network
 
   airflow:
-    build:
+    build: 
       context: ./airflow
       dockerfile: Dockerfile
     container_name: rag-airflow
@@ -104,21 +104,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      opensearch:
-        condition: service_healthy
     env_file:
       - .env
     environment:
       # Airflow-specific environment setup
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=true
-
       - AIRFLOW_HOME=/opt/airflow
       - PYTHONPATH=/opt/airflow/src
       # Container hostnames for Airflow
       - POSTGRES_DATABASE_URL=postgresql+psycopg2://rag_user:rag_password@postgres:5432/rag_db
+      - OPENSEARCH_HOST=http://opensearch:9200
       - OPENSEARCH__HOST=http://opensearch:9200
       - OLLAMA_HOST=http://ollama:11434
       - REDIS__HOST=redis
@@ -178,54 +172,55 @@ services:
     networks:
       - rag-network
 
-  # clickhouse for langfuse analytics
-  clickhouse: 
+  # ClickHouse for Langfuse analytics
+  clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
     container_name: rag-clickhouse
     environment:
       - CLICKHOUSE_DB=langfuse
       - CLICKHOUSE_USER=langfuse
-      - CLICKHOUSE_PASSWORD=langfuse
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - CLICKHOUSE_PASSWORD=langfuse
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD","clickhouse-client", "--query", "SELECT 1"]
-      interval: 1m30s
-      timeout: 30s
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
     networks:
       - rag-network
 
-  # langfuse self-hosted observability platform v2
-  langfuse: 
+  # Langfuse self-hosted observability platform (v2)
+  langfuse:
     image: langfuse/langfuse:2
     container_name: rag-langfuse
     depends_on:
-      - langfuse-postgres:
+      langfuse-postgres:
         condition: service_healthy
-    ports: 
+    ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse
-      - NEXTAUTH_SECRET=changeThisToASecureRandomString32CharsMin
-      - SALT=changeThisToAnotherSecureRandomString
-      - TELEMETRY_ENABLED=false
-      - NEXT_PUBLIC_SIGN_UP_DISABLED=false
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=changeThisToASecureRandomString32CharsMin  
+      - SALT=changeThisToAnotherSecureRandomString 
+      - TELEMETRY_ENABLED=false  
+      - NEXT_PUBLIC_SIGN_UP_DISABLED=false 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/public/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
     networks:
       - rag-network
-    
-    # dedicated postgres for langfuse
+
+  # Dedicated PostgreSQL for Langfuse
   langfuse-postgres:
     image: postgres:16-alpine
     container_name: rag-langfuse-postgres
@@ -245,6 +240,8 @@ services:
     restart: unless-stopped
     networks:
       - rag-network
+
+
 volumes:
   postgres_data:
   opensearch_data:
