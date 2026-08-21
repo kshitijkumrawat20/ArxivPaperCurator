@@ -43,3 +43,28 @@ class AskResponse(BaseModel):
                 "search_mode": "hybrid",
             }
         }
+
+class AgenticAskResponse(AskResponse):
+    """Response model for agentic RAG question answering."""
+
+    reasoning_steps: List[str] = Field(..., description="Agent's decision-making steps")
+    retrieval_attempts: int = Field(..., description="Number of docuement retrieval attempts")
+    trace_id: Optional[str] = Field(None, description="Langfuse trace ID for feedback and debugging")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query": "What are transformers in machine learning?",
+                "answer": "Transformers are neural network architectures...",
+                "sources": ["https://arxiv.org/pdf/1706.03762.pdf"],
+                "chunks_used": 3,
+                "search_mode": "hybrid",
+                "reasoning_steps": [
+                    "Decided to retrieve relevant papers",
+                    "Retrieved documents from database",
+                    "Generated answer from relevant documents",
+                ],
+                "retrieval_attempts": 1,
+                "trace_id": "abc123-def456-ghi789",
+            }
+    }
