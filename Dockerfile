@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm AS base
 
 WORKDIR /app
 
-# Copy configuration files
+# Copy config files
 COPY pyproject.toml uv.lock ./
 
 # UV_COMPILE_BYTECODE for generating .pyc files -> faster application startup.
