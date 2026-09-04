@@ -68,3 +68,33 @@ class AgenticAskResponse(AskResponse):
                 "trace_id": "abc123-def456-ghi789",
             }
     }
+
+class FeedbackRequest(BaseModel):
+    """Request model for user feedback on RAG answer."""
+
+    trace_id: str = Field(..., description = "Langfuse trace ID from the response")
+    score: float = Field(..., description = "Feedback score(0-1 or -1 to 1)", ge=-1, le=1)
+    comments: Optional[str] = Field(None, description = "Optional user comments for feedback")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "trace_id": "abc123-def456-ghi789",
+                "score": 0.8,
+                "comments": "The answer was helpful and accurate.",
+            }
+        }
+
+class FeedbackResponse(BaseModel):
+    """Response model for feedback submission."""
+
+    success: bool = Field(..., description="Whether feedback was recorded successfully")
+    message: str = Field(..., description="Status message")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Feedback recorded successfully",
+            }
+        }
