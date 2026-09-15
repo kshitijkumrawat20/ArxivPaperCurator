@@ -113,8 +113,7 @@ class OllamaClient:
                         usage_metadata["completion_tokens"] = result.get("eval_count", 0)
                     # calcuate total tokens
                     if usage_metadata:
-                        usage_metadata["total_tokens"] =
-                        (
+                        usage_metadata["total_tokens"] = (
                             usage_metadata.get("prompt_tokens", 0) + 
                             usage_metadata.get("completion_tokens", 0)
                         )
@@ -129,7 +128,7 @@ class OllamaClient:
                         usage_metadata["eval_duration_ms"] = round(result["eval_duration"] / 1_000_000, 2)
                     result["usage_metadata"] = usage_metadata
                     logger.debug(f"Usage metadata:{usage_metadata}")
-    
+
                 else:
                     raise OllamaException(f"Generation failed: {response.status_code}")
 

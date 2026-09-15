@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class LangfuseTracer:
-    """Wrapper for Langfuse tracing client."""
+    """Wrapper for Langfuse v3 tracing client with CallBackHandler support."""
 
     def __init__(self, settings: Settings):
         self.settings = settings.langfuse
@@ -17,6 +17,8 @@ class LangfuseTracer:
 
         if self.settings.enabled and self.settings.public_key and self.settings.secret_key:
             try:
+                # Initialize the langfuse v3 singleton client 
+                # configuratiion moved to client initialization
                 self.client = Langfuse(
                     public_key=self.settings.public_key,
                     secret_key=self.settings.secret_key,
@@ -25,124 +27,120 @@ class LangfuseTracer:
                     flush_interval=self.settings.flush_interval,
                     debug=self.settings.debug,
                 )
-                logger.info(f"Langfuse tracing initialized (host: {self.settings.host})")
+                logger.info(f"Langfuse v3 tracing initialized (host: {self.settings.host})")
             except Exception as e:
                 logger.error(f"Failed to initialize Langfuse: {e}")
                 self.client = None
         else:
-            logger.info("Langfuse tracing disabled or missing credentials")
+            logger.info("Langfuse v3 tracing disabled or missing credentials")
 
-    @contextmanager
-    def trace_rag_request(
+    # @contextmanager
+    def get_callback_handler(
         self,
-        query: str,
+        trace_name: Optional[str]=None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
     ):
         """
-        Context manager for tracing a RAG request.
-
+        Get a CallbackHandler for langchain / langgraph integration.
+        This is the v3 recommended approach - all LLM calls are automatically traced. 
         Args:
-            query: The user's query
+            trace_name: Optional name for the trace
             user_id: Optional user identifier
             session_id: Optional session identifier
             metadata: Additional metadata to attach to the trace
+            tags: Optional list of tags for the trace
 
-        Yields:
-            Trace object if Langfuse is enabled, None otherwise
+        returns:
+            CallbackHandler instance if Langfuse is enabled, None otherwise
         """
         if not self.client:
-            yield None
+            return None
+
+        try:
+            # import v3 callbackhandler 
+            from langfuse.langchain import CallbackHandler
+            # create handler with trace metadata 
+            # Note: flush settings are now on the client not the handler 
+            handler = CallbackHandler(
+                trace_name = trace_name, 
+                user_id = user_id,
+                session_id = session_id,
+                metadata = metadata, 
+                tags = tags,
+            )
+            return handler
+        except Exception as e:
+            logger.error(f"Error creating callbackHandler: {e}")
+            return None
+    @contextmanager
+    def trace_langggraph_agent(
+        self,
+        name: str,
+        user_id: Optional[str] = None, 
+        session_id: Optional[str] = None, 
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+    ):
+        """
+        Context manager to wrap langgraph agent execution with a top - level trace span. 
+        
+        This follows the langfuse langgraph cookbook pattern of wrapping the entire graph invocation in a span for better observability.
+
+        Usage: 
+            with tracer.trace_langgraph_agent(name = "agentic_rag", user_id = "user123", session_id = "session456") as trace:
+                result = graph.invoke(input, config = {"callbacks": [handler]}) trace_ctx.update(output result)
+
+
+        Args:
+            name: Name for the trace span (e.g., "agentic_rag_graph") 
+            user_id : Optional user identifier for the trace
+            session_id: Optional session identifier for the trace
+            metadata: Additional metadata
+            tags: Optional list of tags for the trace
+
+
+        Yields:
+            Tuple of (trace_context, callback_handler) for graph execution
+        """
+        if not self.client:
+
+            yield None, None
             return
+        # create callback handler for langgraph integration 
+        # the handler will automatically create traces 
+        handler = self.get_callback_handler(
+            trace_name = name, 
+            user_id = user_id, 
+            session_id = session_id, 
+            metadata = metadata, 
+            tags = tags,
+        )
+        yield (None, handler)
 
-        try:
-            # Create a trace using v2 API
-            trace = self.client.trace(
-                name="rag_request",
-                input={"query": query},
-                metadata=metadata or {},
-                user_id=user_id,
-                session_id=session_id,
-            )
-            yield trace
-        except Exception as e:
-            logger.error(f"Error creating Langfuse trace: {e}")
-            yield None
-
-    def create_span(
+    def get_trace_id(
         self,
-        trace,
-        name: str,
-        input_data: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ):
+        trace = None,
+    ) -> Optional[str]: 
         """
-        Create a span within a trace.
+        Get the current trace ID from Langfuse context.
+
+        In Langfuse v3, the CallbackHandler manages traces automatically.
+        We can get the current trace ID using get_current_trace_id().
 
         Args:
-            trace: Parent trace object
-            name: Name of the span
-            input_data: Input data for the span
-            metadata: Additional metadata
+            trace: Deprecated, not user in v3 
+            Trace Id string or None if trace is disablecd 
 
-        Returns:
-            Span object if successful, None otherwise
         """
-        if not trace or not self.client:
+        if not self.client:
             return None
 
         try:
-            # Create a span using v2 API
-            return self.client.span(
-                trace_id=trace.trace_id,
-                name=name,
-                input=input_data,
-                metadata=metadata or {},
-            )
-        except Exception as e:
-            logger.error(f"Error creating span {name}: {e}")
-            return None
-
-    def create_generation(
-        self,
-        trace,
-        name: str,
-        model: str,
-        input_data: Optional[Dict[str, Any]] = None,
-        output: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        usage: Optional[Dict[str, Any]] = None,
-    ):
-        """
-        Create a generation (LLM call) within a trace.
-
-        Args:
-            trace: Parent trace object
-            name: Name of the generation
-            model: Model name
-            input_data: Input/prompt data
-            output: Generated output
-            metadata: Additional metadata
-            usage: Token usage information
-
-        Returns:
-            Generation object if successful, None otherwise
-        """
-        if not trace or not self.client:
-            return None
-
-        try:
-            # Create a generation using v2 API
-            return self.client.generation(
-                trace_id=trace.trace_id,
-                name=name,
-                model=model,
-                input=input_data,
-                output=output,
-                metadata=metadata or {},
-                usage=usage,
-            )
+            trace_id = self.client.get_current_trace_id()
+            return trace_id
         except Exception as e:
             logger.error(f"Error creating generation {name}: {e}")
             return None
