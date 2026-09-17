@@ -75,6 +75,7 @@ class LangfuseTracer:
         except Exception as e:
             logger.error(f"Error creating callbackHandler: {e}")
             return None
+        
     @contextmanager
     def trace_langggraph_agent(
         self,
@@ -107,7 +108,7 @@ class LangfuseTracer:
         """
         if not self.client:
 
-            yield None, None
+            yield (None, None)
             return
         # create callback handler for langgraph integration 
         # the handler will automatically create traces 
@@ -132,6 +133,7 @@ class LangfuseTracer:
 
         Args:
             trace: Deprecated, not user in v3 
+        Returns:
             Trace Id string or None if trace is disablecd 
 
         """
@@ -142,95 +144,45 @@ class LangfuseTracer:
             trace_id = self.client.get_current_trace_id()
             return trace_id
         except Exception as e:
-            logger.error(f"Error creating generation {name}: {e}")
+            logger.error(f"Errr getting trace ID: {e}")
             return None
 
-    def score_trace(
+    def submit_feedback(
         self,
-        trace,
-        name: str,
-        value: float,
+        trace_id : str,
+        score :float, 
+        name: str = "user-feedback",
         comment: Optional[str] = None,
-    ):
+    ) -> bool: 
         """
-        Add a score to a trace.
-
+        Submit user feedback for a trace (following langfuse cookbook pattern).
         Args:
-            trace: Trace object
-            name: Score name (e.g., "relevance", "accuracy")
-            value: Score value
+            trace_id: ID of the trace
+            name: Score name (default: "user-feedback")
+            score: Score value
             comment: Optional comment
+        
+        Returns:
+            True if feedback submission was successful, False otherwise
         """
-        if not trace or not self.client:
-            return
+        if not self.client:
+            logger.warning("Cannot submit feedback: Langfuse is disabled")
+            return False
 
         try:
             # Create a score using v2 API
             self.client.score(
-                trace_id=trace.trace_id,
+                trace_id=trace_id,
                 name=name,
-                value=value,
+                value=score,
                 comment=comment,
             )
+            logger.info(f"Feedback submitted for trace {trace_id}: score={score}, comment={comment}")
+            return True
         except Exception as e:
             logger.error(f"Error scoring trace: {e}")
+            return False
 
-    def update_span(
-        self,
-        span,
-        output: Optional[Any] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        level: Optional[str] = None,
-        status_message: Optional[str] = None,
-    ):
-        """
-        Update a span with output or additional metadata.
-
-        Args:
-            span: Span object to update
-            output: Output data
-            metadata: Additional metadata
-            level: Log level (DEBUG, INFO, WARNING, ERROR)
-            status_message: Status message
-        """
-        if not span:
-            return
-
-        try:
-            # For v2 API, we can update spans with end_time and output
-            if output is not None:
-                # Update the span with output data
-                span.update(output=output)
-            if metadata:
-                span.update(metadata=metadata)
-            if level:
-                span.update(level=level)
-            if status_message:
-                span.update(status_message=status_message)
-        except Exception as e:
-            logger.error(f"Error updating span: {e}")
-
-    def end_span(self, span, output: Optional[Any] = None, metadata: Optional[Dict[str, Any]] = None):
-        """
-        End a span with optional final output and metadata.
-
-        Args:
-            span: Span object to end
-            output: Final output data
-            metadata: Final metadata
-        """
-        if not span:
-            return
-
-        try:
-            # Update with final data if provided
-            if output is not None or metadata is not None:
-                self.update_span(span, output=output, metadata=metadata)
-
-            # End the span to capture proper timing
-            span.end()
-        except Exception as e:
-            logger.error(f"Error ending span: {e}")
 
     def flush(self):
         """Flush any pending traces."""
@@ -248,3 +200,181 @@ class LangfuseTracer:
                 self.client.shutdown()
             except Exception as e:
                 logger.error(f"Error shutting down Langfuse: {e}")
+
+
+    @contextmanager 
+    def start_generation(
+        self,
+        name: str, 
+        model: str, 
+        input_data: Any, 
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Start a generation span for LLM calls (following langfuse cookbook pattern). This is useful for tracing individual LLM calls.
+        
+        This create a genration observation that tracks: 
+        - Model name and parameters 
+        - Input prompt / messages 
+        - Output completion 
+        - Token Usage 
+        - Latency 
+
+        Usage: 
+            with tracer.start_generation(name = "decision_llm", model = "llama3.2", input_data = prompt) as gen: 
+                response = await llm.generate(...)
+                gen.update(output = response, usage_metadata = {...})
+        Args: 
+            name: Name for this generation (e.g., "decision_llm", "grading_llm")
+            model: Model identifier (e.g., "llama3.2:1b", "gpt-4o")
+            input_data: Input to the LLM (prompt or messages)
+            metadata: Additional metadata (temperature, max_tokens, etc.)
+
+        Yields:
+            Generation context object for updates
+        
+        """
+
+        if not self.client: 
+            # No-op context when disabled 
+            yield None 
+            return 
+
+        try: 
+            generation = self.client.generation(
+                name = name, 
+                model = model, 
+                input = input_data, 
+                metadata = metadata or {},
+
+            )
+            yield generation 
+        except Exception as e: 
+            logger.error(f"Error creating generation span: {e}")
+            yield None
+
+    @contextmanager
+    def start_span(
+        self,
+        name: str,
+        input_data: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Start a generic span for non-LLM operations (following Langfuse cookbook pattern).
+
+        Use this for operations like:
+        - Document retrieval
+        - Query rewriting logic
+        - Document grading logic
+        - Any other processing step
+
+        Usage:
+            with tracer.start_span(name="retrieve_papers", input_data={"query": q}) as span:
+                docs = retrieve(...)
+                span.update(output={"docs_count": len(docs)})
+
+        Args:
+            name: Name for this span (e.g., "retrieve_papers", "grade_documents")
+            input_data: Input to this operation
+            metadata: Additional metadata
+
+        Yields:
+            Span context object for updates
+        """
+        if not self.client:
+            # No-op context when disabled
+            yield None
+            return
+
+        try:
+            span = self.client.span(
+                name=name,
+                input=input_data,
+                metadata=metadata or {},
+            )
+            yield span
+        except Exception as e:
+            logger.error(f"Error creating span: {e}")
+            yield None
+
+    def update_generation(
+        self,
+        generation,
+        output: Any,
+        usage_metadata: Optional[Dict[str, Any]] = None,
+        completion_start_time: Optional[float] = None,
+    ):
+        """
+        Update a generation span with output and usage metrics.
+
+        Args:
+            generation: Generation object from start_generation()
+            output: LLM output/response
+            usage_metadata: Token usage and timing info
+                - prompt_tokens: int
+                - completion_tokens: int
+                - total_tokens: int
+                - latency_ms: float
+            completion_start_time: Optional start time for latency calculation
+        """
+
+        if not generation: 
+            return 
+
+        try: 
+            update_data = {"output": output}
+            if "prompt_tokens" in usage_metadata:
+                update_data["usage"] = {
+                    "input": usage_metadata.get("prompt_tokens", 0),
+                    "output": usage_metadata.get("completion_tokens", 0),
+                    "total": usage_metadata.get("total_tokens", 0),
+                }
+
+                # add timing metadata 
+                if "latency_ms" in usage_metadata:
+                    update_data["metadata"] = update_data.get("metadata", {})
+                    update_data["metadata"]["latency_ms"] = usage_metadata["latency_ms"]                    
+
+            generation.update(**update_data)
+            generation.end()
+        except Exception as e:
+            logger.error(f"Error updating generation span: {e}")
+
+    def update_span(
+        self,
+        span,
+        output: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        level: Optional[str] = None,
+        status_message: Optional[str] = None,
+    ):
+        """
+        Update a span with output and metadata.
+
+        Args:
+            span: Span object from start_span()
+            output: Operation output
+            metadata: Additional metadata to attach
+            level: Log level (e.g., "ERROR", "WARNING") for error tracking
+            status_message: Status or error message
+        """
+        if not span:
+            return
+
+        try:
+            update_data = {}
+            if output is not None:
+                update_data["output"] = output
+            if metadata:
+                update_data["metadata"] = metadata
+            if level:
+                update_data["level"] = level
+            if status_message:
+                update_data["status_message"] = status_message
+
+            if update_data:
+                span.update(**update_data)
+            span.end()
+        except Exception as e:
+            logger.error(f"Error updating span: {e}")
