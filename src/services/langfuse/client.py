@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class LangfuseTracer:
-    """Wrapper for Langfuse v3 tracing client with CallBackHandler support."""
+    """Wrapper for Langfuse v3 tracing client with CallbackHandler support."""
 
     def __init__(self, settings: Settings):
         self.settings = settings.langfuse
@@ -17,8 +17,8 @@ class LangfuseTracer:
 
         if self.settings.enabled and self.settings.public_key and self.settings.secret_key:
             try:
-                # Initialize the langfuse v3 singleton client 
-                # configuratiion moved to client initialization
+                # Initialize Langfuse v3 singleton client
+                # Configuration moved to client initialization (not handler)
                 self.client = Langfuse(
                     public_key=self.settings.public_key,
                     secret_key=self.settings.secret_key,
@@ -32,157 +32,161 @@ class LangfuseTracer:
                 logger.error(f"Failed to initialize Langfuse: {e}")
                 self.client = None
         else:
-            logger.info("Langfuse v3 tracing disabled or missing credentials")
+            logger.info("Langfuse tracing disabled or missing credentials")
 
-    # @contextmanager
     def get_callback_handler(
         self,
-        trace_name: Optional[str]=None,
+        trace_name: Optional[str] = None,
         user_id: Optional[str] = None,
         session_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[list[str]] = None,
     ):
         """
-        Get a CallbackHandler for langchain / langgraph integration.
-        This is the v3 recommended approach - all LLM calls are automatically traced. 
+        Get a CallbackHandler for LangChain/LangGraph integration.
+
+        This is the v3 recommended approach - all LLM calls are automatically traced.
+
         Args:
             trace_name: Optional name for the trace
             user_id: Optional user identifier
             session_id: Optional session identifier
             metadata: Additional metadata to attach to the trace
-            tags: Optional list of tags for the trace
+            tags: Optional tags for the trace
 
-        returns:
+        Returns:
             CallbackHandler instance if Langfuse is enabled, None otherwise
         """
         if not self.client:
             return None
 
         try:
-            # import v3 callbackhandler 
+            # Import v3 CallbackHandler (new path)
             from langfuse.langchain import CallbackHandler
-            # create handler with trace metadata 
-            # Note: flush settings are now on the client not the handler 
+
+            # Create handler with trace metadata
+            # Note: flush settings are now on the client, not the handler
             handler = CallbackHandler(
-                trace_name = trace_name, 
-                user_id = user_id,
-                session_id = session_id,
-                metadata = metadata, 
-                tags = tags,
+                trace_name=trace_name,
+                user_id=user_id,
+                session_id=session_id,
+                metadata=metadata,
+                tags=tags,
             )
             return handler
         except Exception as e:
-            logger.error(f"Error creating callbackHandler: {e}")
+            logger.error(f"Error creating CallbackHandler: {e}")
             return None
-        
+
     @contextmanager
-    def trace_langggraph_agent(
+    def trace_langgraph_agent(
         self,
         name: str,
-        user_id: Optional[str] = None, 
-        session_id: Optional[str] = None, 
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[list[str]] = None,
     ):
         """
-        Context manager to wrap langgraph agent execution with a top - level trace span. 
-        
-        This follows the langfuse langgraph cookbook pattern of wrapping the entire graph invocation in a span for better observability.
+        Context manager to wrap LangGraph agent execution with a top-level trace span.
 
-        Usage: 
-            with tracer.trace_langgraph_agent(name = "agentic_rag", user_id = "user123", session_id = "session456") as trace:
-                result = graph.invoke(input, config = {"callbacks": [handler]}) trace_ctx.update(output result)
+        This follows the Langfuse LangGraph cookbook pattern of wrapping the entire
+        graph invocation in a span for better observability.
 
+        Usage:
+            with tracer.trace_langgraph_agent(name="agentic_rag", ...) as (trace_ctx, handler):
+                result = graph.invoke(input, config={"callbacks": [handler]})
+                trace_ctx.update(output=result)
 
         Args:
-            name: Name for the trace span (e.g., "agentic_rag_graph") 
-            user_id : Optional user identifier for the trace
-            session_id: Optional session identifier for the trace
-            metadata: Additional metadata
-            tags: Optional list of tags for the trace
-
+            name: Name for the trace span (e.g., "agentic_rag_graph")
+            user_id: Optional user identifier
+            session_id: Optional session identifier
+            metadata: Additional metadata to attach
+            tags: Optional tags for the trace
 
         Yields:
             Tuple of (trace_context, callback_handler) for graph execution
         """
         if not self.client:
-
+            # Return no-op context if Langfuse is disabled
             yield (None, None)
             return
-        # create callback handler for langgraph integration 
-        # the handler will automatically create traces 
+
+        # Create callback handler for LangChain/LangGraph integration
+        # The handler will automatically create traces
         handler = self.get_callback_handler(
-            trace_name = name, 
-            user_id = user_id, 
-            session_id = session_id, 
-            metadata = metadata, 
-            tags = tags,
+            trace_name=name,
+            user_id=user_id,
+            session_id=session_id,
+            metadata=metadata,
+            tags=tags,
         )
+
+        # In Langfuse v3, the CallbackHandler manages tracing automatically
+        # We just need to return the handler and a placeholder trace context
+        # The actual trace will be created by the handler
         yield (None, handler)
 
-    def get_trace_id(
-        self,
-        trace = None,
-    ) -> Optional[str]: 
+    def get_trace_id(self, trace=None) -> Optional[str]:
         """
         Get the current trace ID from Langfuse context.
 
         In Langfuse v3, the CallbackHandler manages traces automatically.
         We can get the current trace ID using get_current_trace_id().
-
+ 
         Args:
-            trace: Deprecated, not user in v3 
-        Returns:
-            Trace Id string or None if trace is disablecd 
+            trace: Deprecated, not used in v3
 
+        Returns:
+            Trace ID string or None if trace is disabled
         """
         if not self.client:
             return None
 
         try:
+            # In Langfuse v3, use get_current_trace_id()
             trace_id = self.client.get_current_trace_id()
             return trace_id
         except Exception as e:
-            logger.error(f"Errr getting trace ID: {e}")
+            logger.error(f"Error getting trace ID: {e}")
             return None
 
     def submit_feedback(
         self,
-        trace_id : str,
-        score :float, 
+        trace_id: str,
+        score: float,
         name: str = "user-feedback",
         comment: Optional[str] = None,
-    ) -> bool: 
+    ) -> bool:
         """
-        Submit user feedback for a trace (following langfuse cookbook pattern).
+        Submit user feedback for a trace (following Langfuse cookbook pattern).
+
         Args:
-            trace_id: ID of the trace
-            name: Score name (default: "user-feedback")
-            score: Score value
-            comment: Optional comment
-        
+            trace_id: Trace ID from get_trace_id()
+            score: Feedback score (0-1 or -1 to 1)
+            name: Name of the score (default: "user-feedback")
+            comment: Optional feedback comment
+
         Returns:
-            True if feedback submission was successful, False otherwise
+            True if feedback was submitted successfully, False otherwise
         """
         if not self.client:
             logger.warning("Cannot submit feedback: Langfuse is disabled")
             return False
 
         try:
-            # Create a score using v2 API
             self.client.score(
                 trace_id=trace_id,
                 name=name,
                 value=score,
                 comment=comment,
             )
-            logger.info(f"Feedback submitted for trace {trace_id}: score={score}, comment={comment}")
+            logger.info(f"Submitted feedback for trace {trace_id}: score={score}")
             return True
         except Exception as e:
-            logger.error(f"Error scoring trace: {e}")
+            logger.error(f"Error submitting feedback: {e}")
             return False
-
 
     def flush(self):
         """Flush any pending traces."""
@@ -201,30 +205,30 @@ class LangfuseTracer:
             except Exception as e:
                 logger.error(f"Error shutting down Langfuse: {e}")
 
-
-    @contextmanager 
+    @contextmanager
     def start_generation(
         self,
-        name: str, 
-        model: str, 
-        input_data: Any, 
+        name: str,
+        model: str,
+        input_data: Any,
         metadata: Optional[Dict[str, Any]] = None,
     ):
         """
-        Start a generation span for LLM calls (following langfuse cookbook pattern). This is useful for tracing individual LLM calls.
-        
-        This create a genration observation that tracks: 
-        - Model name and parameters 
-        - Input prompt / messages 
-        - Output completion 
-        - Token Usage 
-        - Latency 
+        Start a generation span for LLM calls (following Langfuse cookbook pattern).
 
-        Usage: 
-            with tracer.start_generation(name = "decision_llm", model = "llama3.2", input_data = prompt) as gen: 
+        This creates a generation observation that tracks:
+        - Model name and parameters
+        - Input prompt/messages
+        - Output completion
+        - Token usage
+        - Latency
+
+        Usage:
+            with tracer.start_generation(name="decision_llm", model="llama3.2", input_data=prompt) as gen:
                 response = await llm.generate(...)
-                gen.update(output = response, usage_metadata = {...})
-        Args: 
+                gen.update(output=response, usage_metadata={...})
+
+        Args:
             name: Name for this generation (e.g., "decision_llm", "grading_llm")
             model: Model identifier (e.g., "llama3.2:1b", "gpt-4o")
             input_data: Input to the LLM (prompt or messages)
@@ -232,24 +236,21 @@ class LangfuseTracer:
 
         Yields:
             Generation context object for updates
-        
         """
+        if not self.client:
+            # No-op context when disabled
+            yield None
+            return
 
-        if not self.client: 
-            # No-op context when disabled 
-            yield None 
-            return 
-
-        try: 
+        try:
             generation = self.client.generation(
-                name = name, 
-                model = model, 
-                input = input_data, 
-                metadata = metadata or {},
-
+                name=name,
+                model=model,
+                input=input_data,
+                metadata=metadata or {},
             )
-            yield generation 
-        except Exception as e: 
+            yield generation
+        except Exception as e:
             logger.error(f"Error creating generation span: {e}")
             yield None
 
@@ -318,28 +319,30 @@ class LangfuseTracer:
                 - latency_ms: float
             completion_start_time: Optional start time for latency calculation
         """
+        if not generation:
+            return
 
-        if not generation: 
-            return 
-
-        try: 
+        try:
             update_data = {"output": output}
-            if "prompt_tokens" in usage_metadata:
-                update_data["usage"] = {
-                    "input": usage_metadata.get("prompt_tokens", 0),
-                    "output": usage_metadata.get("completion_tokens", 0),
-                    "total": usage_metadata.get("total_tokens", 0),
-                }
 
-                # add timing metadata 
+            if usage_metadata:
+                # Add usage metadata following Langfuse format
+                if "prompt_tokens" in usage_metadata:
+                    update_data["usage"] = {
+                        "input": usage_metadata.get("prompt_tokens", 0),
+                        "output": usage_metadata.get("completion_tokens", 0),
+                        "total": usage_metadata.get("total_tokens", 0),
+                    }
+
+                # Add timing metadata
                 if "latency_ms" in usage_metadata:
                     update_data["metadata"] = update_data.get("metadata", {})
-                    update_data["metadata"]["latency_ms"] = usage_metadata["latency_ms"]                    
+                    update_data["metadata"]["latency_ms"] = usage_metadata["latency_ms"]
 
             generation.update(**update_data)
             generation.end()
         except Exception as e:
-            logger.error(f"Error updating generation span: {e}")
+            logger.error(f"Error updating generation: {e}")
 
     def update_span(
         self,
