@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import hybrid_search, ping
+from src.routers import hybrid_search, ping, agentic_ask 
 from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.embeddings.factory import make_embeddings_service
@@ -15,6 +15,7 @@ from src.services.ollama.factory import make_ollama_client
 from src.services.pdf_parser.factory import make_pdf_parser_service
 from src.services.cache.factory import make_cache_client 
 from src.services.langfuse.factory import make_langfuse_tracer
+from src.services.telegram.factory import make_telegram_service
 
 
 # Setup logging
@@ -71,11 +72,31 @@ async def lifespan(app: FastAPI):
     app.state.langfuse_tracer = make_langfuse_tracer()
     app.state.cache_client = make_cache_client(settings)  # Initialize cache client
     logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Ollama, langfuse, Cache")
+    telegram_service = make_telegram_service(
+        opensearch_client = state.opensearch_client, 
+        embeddings_client = state.embeddings_service, 
+        ollama_client = state.ollama_client, 
+        cache_client = app.state.cache_client, 
+        langfuse_tracer = app.state.langfuse_tracer,
+    )
+    if telegram_service: 
+        app.state.telegram_service = telegram_service
+        try: 
+            await telegram_service.start()
+            logger.info("Telegram bot started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start Telegram bot: {e}")
+    else:
+        logger.info("Telegram bot not configured - skipping Initialization")
 
     logger.info("API ready")
     yield
 
     # Cleanup
+    if hasattr(app.state, "telegram_service") and app.state.telegram_service:
+        await app.state.telegram_service.stop()
+        logger.info("Telegram bot stopped")
+
     database.teardown()
     logger.info("API shutdown complete")
 
@@ -92,6 +113,7 @@ app.include_router(ping.router, prefix="/api/v1")
 app.include_router(ask_router, prefix="/api/v1") # RAG endpoint for question answering
 app.include_router(stream_router, prefix="/api/v1") # streaming RAG endpoint for question answering
 app.include_router(hybrid_search.router, prefix="/api/v1")  # Hybrid search supporting all modes
+app.include_router(agentic_ask.router)  # Agentic RAG endpoint for question answering
 
 
 if __name__ == "__main__":
