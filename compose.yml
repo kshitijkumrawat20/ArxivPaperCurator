@@ -346,7 +346,7 @@ services:
       - rag-network
 
   langfuse-minio:
-    image: docker.io/minio/minio
+    image: quay.io/minio/aistor/minio:latest
     container_name: rag-langfuse-minio
     restart: unless-stopped
     entrypoint: sh
