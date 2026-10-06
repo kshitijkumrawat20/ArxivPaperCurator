@@ -346,21 +346,23 @@ services:
       - rag-network
 
   langfuse-minio:
-    image: quay.io/minio/aistor/minio:latest
+    image: rustfs/rustfs:latest
     container_name: rag-langfuse-minio
     restart: unless-stopped
-    entrypoint: sh
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     environment:
-      - MINIO_ROOT_USER=langfuse_minio
-      - MINIO_ROOT_PASSWORD=langfuse_minio_secret
+      - RUSTFS_VOLUMES=/data/rustfs
+      - RUSTFS_ADDRESS=0.0.0.0:9000
+      - RUSTFS_CONSOLE_ADDRESS=0.0.0.0:9001
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_ACCESS_KEY=${LANGFUSE_MINIO_ACCESS_KEY}
+      - RUSTFS_SECRET_KEY=${LANGFUSE_MINIO_SECRET_KEY}
     ports:
       - "19000:9000"
       - "19001:9001"
     volumes:
-      - langfuse_v3_minio_data:/data
+      - langfuse_v3_rustfs_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9000/health || exit 1"]
       interval: 5s
       timeout: 10s
       retries: 10
@@ -377,7 +379,7 @@ volumes:
   clickhouse_data:
   redis_data:
   langfuse_v3_postgres_data:
-  langfuse_v3_minio_data:
+  langfuse_v3_rustfs_data:
 
 networks:
   rag-network:
