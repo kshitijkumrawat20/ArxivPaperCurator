@@ -4,8 +4,8 @@ from typing import Optional
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-from src.schemas.api.ask import AskRequest, AskResponse
-from src.schemas.api.search import HybridSearchRequest
+from src.schema.api.ask import AskRequest, AskResponse
+from src.schema.api.search import HybridSearchRequest
 
 logger = logging.getLogger(__name__)
 

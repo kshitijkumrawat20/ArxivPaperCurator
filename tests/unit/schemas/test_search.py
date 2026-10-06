@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from src.schemas.api.search import SearchHit, SearchRequest, SearchResponse
+from src.schema.api.search import SearchHit, SearchRequest, SearchResponse
 
 
 def test_search_request_valid():
