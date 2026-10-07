@@ -73,9 +73,9 @@ async def lifespan(app: FastAPI):
     app.state.cache_client = make_cache_client(settings)  # Initialize cache client
     logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Ollama, langfuse, Cache")
     telegram_service = make_telegram_service(
-        opensearch_client = state.opensearch_client, 
-        embeddings_client = state.embeddings_service, 
-        ollama_client = state.ollama_client, 
+        opensearch_client = app.state.opensearch_client, 
+        embeddings_client = app.state.embeddings_service, 
+        ollama_client = app.state.ollama_client, 
         cache_client = app.state.cache_client, 
         langfuse_tracer = app.state.langfuse_tracer,
     )
