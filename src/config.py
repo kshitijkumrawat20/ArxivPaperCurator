@@ -1,7 +1,7 @@
 
 #Central settings object first. Everything else depends on it.
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 import os 
 from pathlib import Path 
 from pydantic import BaseModel, Field, field_validator
@@ -145,6 +145,21 @@ class RedisSettings(BaseConfigSettings):
     ttl_hours: int = 6 # cache TTL in hours
 
 
+class TelegramSettings(BaseConfigSettings):
+    """Telegram bot settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=[".env", str(ENV_FILE_PATH)],
+        env_prefix="TELEGRAM__",
+        extra="ignore",
+        frozen=True,
+        case_sensitive=False,
+    )
+
+    enabled: bool = False
+    bot_token: str = ""
+
+
 class Settings(BaseConfigSettings):
     """Application settings."""
     
@@ -182,6 +197,8 @@ class Settings(BaseConfigSettings):
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
     # Redis settings
     redis: RedisSettings = Field(default_factory=RedisSettings)
+    # Telegram bot settings
+    telegram: TelegramSettings = Field(default_factory=TelegramSettings)
 
 
     @field_validator("postgres_database_url")
