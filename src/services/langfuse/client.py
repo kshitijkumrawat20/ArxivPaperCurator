@@ -79,6 +79,37 @@ class LangfuseTracer:
             return None
 
     @contextmanager
+    def trace_rag_request(
+        self,
+        query: str,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """Create the current top-level observation for a RAG request."""
+        if not self.client:
+            yield None
+            return
+
+        trace_metadata = dict(metadata or {})
+        if user_id:
+            trace_metadata["user_id"] = user_id
+        if session_id:
+            trace_metadata["session_id"] = session_id
+
+        try:
+            with self.client.start_as_current_observation(
+                name="rag_request",
+                as_type="chain",
+                input={"query": query},
+                metadata=trace_metadata,
+            ) as trace:
+                yield trace
+        except Exception as e:
+            logger.error(f"Error creating RAG trace: {e}")
+            yield None
+
+    @contextmanager
     def trace_langgraph_agent(
         self,
         name: str,
@@ -289,7 +320,7 @@ class LangfuseTracer:
             return
 
         try:
-            span = self.client.span(
+            span = self.client.start_observation(
                 name=name,
                 input=input_data,
                 metadata=metadata or {},
@@ -298,6 +329,27 @@ class LangfuseTracer:
         except Exception as e:
             logger.error(f"Error creating span: {e}")
             yield None
+
+    def create_span(
+        self,
+        trace,
+        name: str,
+        input_data: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """Create a child observation for the current RAG trace."""
+        if not self.client:
+            return None
+
+        try:
+            return self.client.start_observation(
+                name=name,
+                input=input_data,
+                metadata=metadata or {},
+            )
+        except Exception as e:
+            logger.error(f"Error creating span: {e}")
+            return None
 
     def update_generation(
         self,
