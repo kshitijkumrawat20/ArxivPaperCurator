@@ -130,7 +130,13 @@ class OllamaClient:
                     logger.debug(f"Usage metadata:{usage_metadata}")
 
                 else:
-                    raise OllamaException(f"Generation failed: {response.status_code}")
+                    detail = response.text.strip()
+                    raise OllamaException(
+                        f"Generation failed with status {response.status_code} for model '{model}'"
+                        + (f": {detail[:500]}" if detail else "")
+                    )
+
+                return result
 
         except httpx.ConnectError as e:
             raise OllamaConnectionError(f"Cannot connect to Ollama service: {e}")
@@ -161,7 +167,11 @@ class OllamaClient:
 
                 async with client.stream("POST", f"{self.base_url}/api/generate", json=data) as response:
                     if response.status_code != 200:
-                        raise OllamaException(f"Streaming generation failed: {response.status_code}")
+                        detail = (await response.aread()).decode(errors="replace").strip()
+                        raise OllamaException(
+                            f"Streaming generation failed with status {response.status_code} for model '{model}'"
+                            + (f": {detail[:500]}" if detail else "")
+                        )
 
                     async for line in response.aiter_lines():
                         if line.strip():

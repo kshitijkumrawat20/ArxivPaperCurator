@@ -1,5 +1,6 @@
 import logging
 from contextlib import contextmanager
+import sys
 from typing import Any, Dict, Optional
 
 from langfuse import Langfuse
@@ -97,17 +98,26 @@ class LangfuseTracer:
         if session_id:
             trace_metadata["session_id"] = session_id
 
+        observation_context = self.client.start_as_current_observation(
+            name="rag_request",
+            as_type="chain",
+            input={"query": query},
+            metadata=trace_metadata,
+        )
         try:
-            with self.client.start_as_current_observation(
-                name="rag_request",
-                as_type="chain",
-                input={"query": query},
-                metadata=trace_metadata,
-            ) as trace:
-                yield trace
+            trace = observation_context.__enter__()
         except Exception as e:
             logger.error(f"Error creating RAG trace: {e}")
             yield None
+            return
+
+        try:
+            yield trace
+        except BaseException:
+            observation_context.__exit__(*sys.exc_info())
+            raise
+        else:
+            observation_context.__exit__(None, None, None)
 
     @contextmanager
     def trace_langgraph_agent(
