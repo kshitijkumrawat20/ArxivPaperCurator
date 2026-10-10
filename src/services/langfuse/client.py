@@ -443,3 +443,32 @@ class LangfuseTracer:
             span.end()
         except Exception as e:
             logger.error(f"Error updating span: {e}")
+
+    def end_span(
+        self,
+        span,
+        output: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        level: Optional[str] = None,
+        status_message: Optional[str] = None,
+    ):
+        """Update and finish a generic Langfuse observation."""
+        if not span:
+            return
+
+        try:
+            update_data = {}
+            if output is not None:
+                update_data["output"] = output
+            if metadata:
+                update_data["metadata"] = metadata
+            if level:
+                update_data["level"] = level
+            if status_message:
+                update_data["status_message"] = status_message
+
+            if update_data:
+                span.update(**update_data)
+            span.end()
+        except Exception as e:
+            logger.error(f"Error ending span: {e}")

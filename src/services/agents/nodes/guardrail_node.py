@@ -129,6 +129,5 @@ async def ainvoke_guardrail_step(
                 metadata={"execution_time_ms": execution_time, "fallback": True},
                 level="WARNING",
             )
-            runtime.context.langfuse_tracer.end_span(span)
 
     return {"guardrail_result": response}
