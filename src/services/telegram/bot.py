@@ -188,7 +188,7 @@ class TelegramBot:
 
             # Generate answer
             prompt = RAGPromptBuilder().create_rag_prompt(query=query, chunks=chunks)
-            ollama_response = await self.ollama.generate(model="llama3.2:1b", prompt=prompt, stream=False)
+            ollama_response = await self.ollama.generate(model="qwen2.5-coder:1.5b", prompt=prompt, stream=False)
             answer = ollama_response.get("response", "") if ollama_response else ""
 
             # Build response

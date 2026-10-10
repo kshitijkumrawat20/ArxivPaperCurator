@@ -13,7 +13,7 @@ class GraphConfig(BaseModel):
 
     :param max_retrieval_attempts: Maximum number of retrieval attempts before fallback
     :param guardrail_threshold: Threshold score for guardrail validation (0-100)
-    :param model: Default model to use for LLM calls (e.g., "llama3.2:1b")
+    :param model: Default model to use for LLM calls (e.g., "qwen2.5-coder:1.5b")
     :param temperature: Temperature for LLM generation (0.0 = deterministic)
     :param top_k: Number of documents to retrieve from search
     :param use_hybrid: Whether to use hybrid search (BM25 + vector)
@@ -24,7 +24,7 @@ class GraphConfig(BaseModel):
 
     max_retrieval_attempts: int = 2
     guardrail_threshold: int = 60
-    model: str = "llama3.2:1b"
+    model: str = "qwen2.5-coder:1.5b"
     temperature: float = 0.0
     top_k: int = 3
     use_hybrid: bool = True

@@ -58,7 +58,7 @@ uv run python gradio_launcher.py
     "query": "Your question",
     "top_k": 3,              // Chunks to retrieve (1-10)
     "use_hybrid": true,      // BM25 + vector search
-    "model": "llama3.2:1b",  // LLM model
+    "model": "qwen2.5-coder:1.5b",  // LLM model
     "categories": ["cs.AI"]  // Optional filter
 }
 ```
@@ -82,7 +82,7 @@ uv run python gradio_launcher.py
 ```bash
 # .env file
 OLLAMA_HOST=http://ollama:11434
-OLLAMA__DEFAULT_MODEL=llama3.2:1b
+OLLAMA__DEFAULT_MODEL=qwen2.5-coder:1.5b
 JINA_API_KEY=your_key_here  # For embeddings
 ```
 
@@ -106,7 +106,7 @@ curl -X POST "http://localhost:8000/api/v1/stream" \
 | Issue | Solution |
 |-------|----------|
 | 404 on `/stream` | Rebuild API: `docker compose build api && docker compose restart api` |
-| Slow responses | Use smaller model: `llama3.2:1b` or reduce `top_k` |
+| Slow responses | Use smaller model: `qwen2.5-coder:1.5b` or reduce `top_k` |
 | No Gradio | Port changed to 7861: `http://localhost:7861` |
 | Ollama errors | Check service: `docker exec rag-ollama ollama list` |
 

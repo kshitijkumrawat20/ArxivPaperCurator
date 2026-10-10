@@ -14,7 +14,7 @@ def make_agentic_rag_service(
     ollama_client: OllamaClient,
     embeddings_client: JinaEmbeddingsClient,
     langfuse_tracer: Optional[LangfuseTracer] = None,
-    model: str = "llama3.2:1b",
+    model: str = "qwen2.5-coder:1.5b",
     top_k: int = 3,
     use_hybrid: bool = True,
 ) -> AgenticRAGService:

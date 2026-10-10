@@ -176,7 +176,7 @@ class Settings(BaseConfigSettings):
 
     # ollama configurations 
     ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2:1b"
+    ollama_model: str = "qwen2.5-coder:1.5b"
     ollama_timeout : int = 300 # atleast 5 min 
 
     # Jina Ai embedding configurations 

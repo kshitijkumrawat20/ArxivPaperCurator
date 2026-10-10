@@ -414,7 +414,7 @@ Bot: ⚙️ Your Settings
 
      *Search Mode:* HYBRID
      *Results per query:* 3 papers
-     *Model:* llama3.2:1b
+     *Model:* qwen2.5-coder:1.5b
      *Categories:* All
 
      [Interactive buttons appear]:
@@ -533,7 +533,7 @@ TELEGRAM__RATE_LIMIT_MESSAGES_PER_MINUTE=20
 # Default User Preferences
 TELEGRAM__DEFAULT_TOP_K=3
 TELEGRAM__DEFAULT_USE_HYBRID=true
-TELEGRAM__DEFAULT_MODEL=llama3.2:1b
+TELEGRAM__DEFAULT_MODEL=qwen2.5-coder:1.5b
 ```
 
 ### User Settings (Customizable per User)
