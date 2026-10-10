@@ -197,10 +197,15 @@ class AgenticRAGService:
                 "top_k": self.graph_config.top_k,
                 "use_hybrid": self.graph_config.use_hybrid,
                 "model": model_to_use,
+                "user_id": user_id,
+                "session_id": f"session_{user_id}",
             }
-            # V3 SDK: Use start_as_current_span - will be used with 'with' statement
-            trace = self.langfuse_tracer.client.start_as_current_span(
+            # Langfuse v3 uses observations for current trace context.
+            trace = self.langfuse_tracer.client.start_as_current_observation(
                 name="agentic_rag_request",
+                as_type="chain",
+                input={"query": query},
+                metadata=metadata,
             )
 
         # Use proper context manager pattern
@@ -210,9 +215,6 @@ class AgenticRAGService:
                 with trace as trace_obj:
                     trace_obj.update(
                         input={"query": query},
-                        metadata=metadata,
-                        user_id=user_id,
-                        session_id=f"session_{user_id}",
                     )
                     logger.debug(f"Trace created: {trace_obj}")
                     return await self._run_workflow(query, model_to_use, user_id, trace_obj)
@@ -267,8 +269,7 @@ class AgenticRAGService:
             config = {"thread_id": f"user_{user_id}_session_{int(time.time())}"}
 
             # Add CallbackHandler for automatic LLM tracing
-            # IMPORTANT: CallbackHandler automatically inherits the current span context
-            # Since we're inside start_as_current_span, it will be linked automatically
+            # CallbackHandler automatically inherits the current observation context.
             if self.langfuse_tracer and trace:
                 try:
                     # V3 SDK: CallbackHandler() automatically uses current trace context
@@ -305,7 +306,6 @@ class AgenticRAGService:
                         "execution_time": execution_time,
                     }
                 )
-                trace.end()
                 self.langfuse_tracer.flush()
 
             logger.info("=" * 80)
