@@ -117,18 +117,16 @@ class HybridIndexingService:
                     }
                 )
 
-                # Step 4: bulk index chunks into OpenSearch
-                results = self.opensearch_client.bulk_index_chunks(
-                    chunks_with_embeddings
-                )
-                logger.info(f"Indexed {arxiv_id}: {results['success']} chunks successfull, {results['failed']} chunks failed")
+            # Step 4: bulk index all chunks after preparing their payloads.
+            results = self.opensearch_client.bulk_index_chunks(chunks_with_embeddings)
+            logger.info(f"Indexed {arxiv_id}: {results['success']} chunks successfull, {results['failed']} chunks failed")
 
-                return {
-                    "chunks_created": len(chunks),
-                    "chunks_indexed": results['success'],
-                    "embeddings_generated": len(embeddings),
-                    "error": results['failed'],
-                }
+            return {
+                "chunks_created": len(chunks),
+                "chunks_indexed": results['success'],
+                "embeddings_generated": len(embeddings),
+                "error": results['failed'],
+            }
         except Exception as e:
             logger.error(f"Error indexing paper {arxiv_id}: {e}")
             return {"chunks_created": 0, "chunks_indexed": 0, "embeddings_generated": 0, "error": 1}
@@ -183,4 +181,3 @@ class HybridIndexingService:
         
         # Index with new data 
         return await self.index_paper(paper_data)
-    

@@ -88,7 +88,8 @@ class TextChunker:
 
         # Fallback to traditional word-based chunking
         logger.info(f"Using traditional word-based chunking for {arxiv_id}")
-        return self.chunk_text(full_text, arxiv_id, paper_id)
+        source_text = full_text if full_text and full_text.strip() else abstract
+        return self.chunk_text(source_text, arxiv_id, paper_id)
 
     def chunk_text(self, text: str, arxiv_id: str, paper_id: str) -> List[TextChunk]:
         """Chunk text into overlapping segments.
@@ -111,7 +112,7 @@ class TextChunker:
             if words:
                 return [
                     TextChunk(
-                        text=self._reconstruct_text(words, text),
+                        text=self._reconstruct_text(words),
                         metadata=ChunkMetadata(
                             chunk_index=0,
                             start_char=0,
