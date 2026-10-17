@@ -38,6 +38,8 @@ class ArxivSettings(BaseConfigSettings):
     timeout_seconds: int = 30 
     max_results: int = 5 
     search_category: str= "cs.AI"  # Default search category for AI papers
+    search_categories: Optional[List[str]] = None  # Overrides search_category when configured
+    process_pdfs: bool = True  # Preserve current scheduled behavior unless explicitly disabled
     download_max_retries: int = 3
     download_retry_delay: float = 5.0  # Delay between retries in seconds
     max_concurrent_downloads: int = 5  # Maximum number of concurrent downloads

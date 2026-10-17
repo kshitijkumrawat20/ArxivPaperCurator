@@ -48,6 +48,8 @@ class MetadataFetcher:
         process_pdfs: bool = True,
         store_to_db: bool = True,
         db_session: Optional[Session] = None,
+        categories: Optional[List[str]] = None,
+        start: int = 0,
         # index_to_opensearch: bool = False,
     ) -> Dict[str, Any]:
         """
@@ -56,6 +58,8 @@ class MetadataFetcher:
         :param max_results: Maximum papers to fetch
         :param from_date: Filter papers from this date (YYYYMMDD)
         :param to_date: Filter papers to this date (YYYYMMDD)
+        :param categories: Optional arXiv category override
+        :param start: Starting arXiv result offset for pagination
         :param process_pdfs: Whether to download and parse PDFs
         :param store_to_db: Whether to store results in database
         :param db_session: Database session (required if store_to_db=True)
@@ -84,10 +88,17 @@ class MetadataFetcher:
         try:
             # Step 1: Fetch paper metadata from arXiv
             papers = await self.arxiv_client.fetch_paperts(
-                max_results=max_results, from_date=from_date, to_date=to_date, sort_by="submittedDate", sort_order="descending"
+                max_results=max_results,
+                start=start,
+                from_date=from_date,
+                to_date=to_date,
+                sort_by="submittedDate",
+                sort_order="descending",
+                categories=categories,
             )
 
             results["papers_fetched"] = len(papers)
+            results["arxiv_ids"] = [paper.arxiv_id for paper in papers]
 
             if not papers:
                 logger.warning("No papers found")
@@ -96,7 +107,19 @@ class MetadataFetcher:
             # Step 2: Process PDFs if requested
             pdf_results = {}
             if process_pdfs:
-                pdf_results = await self._process_pdfs_batch(papers)
+                papers_to_process = papers
+                if store_to_db and db_session:
+                    paper_repo = PaperRepository(db_session)
+                    papers_to_process = []
+                    for paper in papers:
+                        existing = paper_repo.get_by_arxiv_id(paper.arxiv_id)
+                        already_has_full_text = bool(existing and existing.pdf_processed and existing.raw_text)
+                        if already_has_full_text:
+                            continue
+                        papers_to_process.append(paper)
+                pdf_results = await self._process_pdfs_batch(papers_to_process) if papers_to_process else {
+                    "downloaded": 0, "parsed": 0, "parsed_papers": {}, "errors": []
+                }
                 results["pdfs_downloaded"] = pdf_results["downloaded"]
                 results["pdfs_parsed"] = pdf_results["parsed"]
                 results["errors"].extend(pdf_results["errors"])
@@ -370,9 +393,7 @@ class MetadataFetcher:
                     )
                 else:
                     # No parsed content - just store metadata
-                    paper_data.update(
-                        {"pdf_processed": False, "parser_metadata": {"note": "PDF processing not available or failed"}}
-                    )
+                    # Omit parsed-content fields so an upsert cannot erase a previously parsed PDF.
                     logger.debug(f"Storing paper {paper.arxiv_id} with metadata only")
 
                 paper_create = PaperCreate(**paper_data)

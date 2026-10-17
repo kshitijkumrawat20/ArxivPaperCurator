@@ -51,6 +51,17 @@ class ArxivClient:
     def search_category(self) -> str:
         return self._settings.search_category
 
+    @property
+    def search_categories(self) -> List[str]:
+        """Configured categories, falling back to the legacy single-category setting."""
+        categories = self._settings.search_categories or [self.search_category]
+        return list(dict.fromkeys(category.strip() for category in categories if category.strip()))
+
+    @property
+    def process_pdfs(self) -> bool:
+        """Whether scheduled ingestion should download and parse PDFs by default."""
+        return self._settings.process_pdfs
+
     async def fetch_paperts(
         self, 
         max_results: Optional[int] = None,
@@ -58,10 +69,11 @@ class ArxivClient:
         sort_by: str = "submittedDate",
         sort_order: str = "descending",
         from_date: Optional[str] = None,
-        to_date: Optional[str] = None
+        to_date: Optional[str] = None,
+        categories: Optional[List[str]] = None,
     ) -> List[ArxivPaper]: 
         """
-        Fetch papers from arXiv for the configured category.
+        Fetch papers from arXiv for the requested categories or configured defaults.
 
         Args:
             max_results: Maximum number of papers to fetch (uses settings default if None)
@@ -70,6 +82,7 @@ class ArxivClient:
             sort_order: Sort order (ascending, descending)
             from_date: Filter papers submitted after this date (format: YYYYMMDD)
             to_date: Filter papers submitted before this date (format: YYYYMMDD)
+            categories: Optional category override; defaults to search_categories or legacy search_category
 
         Returns:
             List of ArxivPaper objects for the configured category
@@ -78,8 +91,14 @@ class ArxivClient:
         if max_results is None: 
             max_results = self.max_results
         
-        # build search query 
-        search_query = f"cat:{self.search_category}"
+        selected_categories = categories if categories is not None else self.search_categories
+        selected_categories = list(dict.fromkeys(category.strip() for category in selected_categories if category.strip()))
+        if not selected_categories:
+            raise ValueError("At least one arXiv category must be configured or provided")
+
+        # A single category retains the legacy query shape; multiple categories use arXiv's OR syntax.
+        category_query = " OR ".join(f"cat:{category}" for category in selected_categories)
+        search_query = category_query if len(selected_categories) == 1 else f"({category_query})"
 
         # add date filters if provided 
         if from_date or to_date: 
@@ -97,11 +116,11 @@ class ArxivClient:
             "sortOrder": sort_order
         }
 
-        safe = ":+[]" # dont encode:, +, [, ] chacters needed for arxiv queries 
+        safe = ":+[]()" # preserve arXiv query operators and multi-category grouping
         url = f"{self.base_url}?{urlencode(params,quote_via=quote, safe=safe)}"
 
         try: 
-            logger.info(f" Fetching {max_results} {self.search_category} papers from arXiv API starting at index {start}...")
+            logger.info(f" Fetching {max_results} papers for {selected_categories} from arXiv API starting at index {start}...")
 
             # add rate limiting delay between all requests 
             if self._last_request_time is not None:
