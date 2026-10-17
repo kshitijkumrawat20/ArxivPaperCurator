@@ -90,11 +90,73 @@ class TestMetadataFetcher:
         assert len(result["errors"]) == 0
 
     @pytest.mark.asyncio
+    async def test_metadata_only_fetch_skips_pdf_work_and_stores_paper(self, metadata_fetcher, sample_arxiv_papers):
+        metadata_fetcher.arxiv_client.fetch_paperts = AsyncMock(return_value=sample_arxiv_papers)
+        metadata_fetcher._store_papers_to_db = MagicMock(return_value=2)
+        metadata_fetcher._process_pdfs_batch = AsyncMock()
+        db_session = MagicMock()
+
+        result = await metadata_fetcher.fetch_and_process_papers(
+            max_results=2,
+            process_pdfs=False,
+            store_to_db=True,
+            db_session=db_session,
+            categories=["cs.AI", "cs.LG"],
+        )
+
+        metadata_fetcher._process_pdfs_batch.assert_not_awaited()
+        metadata_fetcher._store_papers_to_db.assert_called_once_with(sample_arxiv_papers, {}, db_session)
+        assert result["papers_stored"] == 2
+        assert result["arxiv_ids"] == [paper.arxiv_id for paper in sample_arxiv_papers]
+        assert metadata_fetcher.arxiv_client.fetch_paperts.call_args.kwargs["categories"] == ["cs.AI", "cs.LG"]
+
+    def test_metadata_only_upsert_does_not_clear_existing_parsed_content(
+        self, metadata_fetcher, sample_arxiv_papers
+    ):
+        repository = MagicMock()
+        repository.upsert.return_value = object()
+        session = MagicMock()
+
+        with patch("src.services.metadata_fetcher.PaperRepository", return_value=repository):
+            stored = metadata_fetcher._store_papers_to_db(sample_arxiv_papers[:1], {}, session)
+
+        assert stored == 1
+        paper_create = repository.upsert.call_args.args[0]
+        update_fields = paper_create.model_dump(exclude_unset=True)
+        assert "raw_text" not in update_fields
+        assert "pdf_processed" not in update_fields
+        session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_pdf_processing_skips_papers_that_already_have_full_text(
+        self, metadata_fetcher, sample_arxiv_papers
+    ):
+        metadata_fetcher.arxiv_client.fetch_paperts = AsyncMock(return_value=sample_arxiv_papers)
+        metadata_fetcher._process_pdfs_batch = AsyncMock(
+            return_value={"downloaded": 1, "parsed": 1, "parsed_papers": {}, "errors": []}
+        )
+        metadata_fetcher._store_papers_to_db = MagicMock(return_value=2)
+        repository = MagicMock()
+        repository.get_by_arxiv_id.side_effect = [
+            MagicMock(pdf_processed=True, raw_text="previously parsed text"),
+            None,
+        ]
+
+        with patch("src.services.metadata_fetcher.PaperRepository", return_value=repository):
+            await metadata_fetcher.fetch_and_process_papers(
+                process_pdfs=True,
+                store_to_db=True,
+                db_session=MagicMock(),
+            )
+
+        metadata_fetcher._process_pdfs_batch.assert_awaited_once_with([sample_arxiv_papers[1]])
+
+    @pytest.mark.asyncio
     async def test_rate_limiting_respected(self, metadata_fetcher):
         """Test that rate limiting delays are respected."""
         # This is a basic test to ensure the rate limiting logic exists
         # More comprehensive testing would require timing analysis
-        metadata_fetcher.arxiv_client.fetch_papers = AsyncMock(return_value=[])
+        metadata_fetcher.arxiv_client.fetch_paperts = AsyncMock(return_value=[])
 
         start_time = time.time()
         await metadata_fetcher.fetch_and_process_papers(max_results=1)

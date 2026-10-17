@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import httpx
@@ -50,7 +51,7 @@ class TestArxivClient:
         client = make_arxiv_client()
         assert isinstance(client, ArxivClient)
         assert client.search_category == "cs.AI"
-        assert client.max_results == 15  # Default from ArxivSettings
+        assert client.max_results == 5  # Default from ArxivSettings
 
     @pytest.mark.asyncio
     async def test_fetch_papers_success(self, arxiv_client, mock_arxiv_response):
@@ -62,7 +63,7 @@ class TestArxivClient:
 
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
 
-            papers = await arxiv_client.fetch_papers(max_results=1)
+            papers = await arxiv_client.fetch_paperts(max_results=1)
 
             assert len(papers) == 1
             assert papers[0].arxiv_id == "2024.0001v1"
@@ -81,12 +82,90 @@ class TestArxivClient:
 
             mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
 
-            papers = await arxiv_client.fetch_papers(max_results=1, from_date="20240101", to_date="20240131")
+            papers = await arxiv_client.fetch_paperts(max_results=1, from_date="20240101", to_date="20240131")
 
             assert len(papers) == 1
             # Verify the URL includes date filters
             call_args = mock_client.return_value.__aenter__.return_value.get.call_args[0][0]
-            assert "submittedDate:[202401010000+TO+202401312359]" in call_args
+            search_query = parse_qs(urlparse(call_args).query)["search_query"][0]
+            assert "submittedDate:[202401010000 TO 202401312359]" in search_query
+
+    @pytest.mark.asyncio
+    async def test_multi_category_query_preserves_date_and_pagination_options(self, arxiv_client, mock_arxiv_response):
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_response = MagicMock()
+            mock_response.text = mock_arxiv_response
+            mock_response.raise_for_status.return_value = None
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+
+            await arxiv_client.fetch_paperts(
+                max_results=25,
+                start=40,
+                sort_by="lastUpdatedDate",
+                sort_order="ascending",
+                from_date="20240101",
+                to_date="20240131",
+                categories=["cs.AI", "cs.LG", "cs.AI"],
+            )
+
+            request_url = mock_client.return_value.__aenter__.return_value.get.call_args.args[0]
+            search_query = parse_qs(urlparse(request_url).query)["search_query"][0]
+            assert "(cat:cs.AI OR cat:cs.LG)" in search_query
+            assert "submittedDate:[202401010000 TO 202401312359]" in search_query
+            assert "start=40" in request_url
+            assert "max_results=25" in request_url
+            assert "sortBy=lastUpdatedDate" in request_url
+            assert "sortOrder=ascending" in request_url
+
+    @pytest.mark.asyncio
+    async def test_legacy_category_is_used_when_no_override_is_supplied(self, arxiv_client, mock_arxiv_response):
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_response = MagicMock()
+            mock_response.text = mock_arxiv_response
+            mock_response.raise_for_status.return_value = None
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+
+            await arxiv_client.fetch_paperts(max_results=1)
+
+            request_url = mock_client.return_value.__aenter__.return_value.get.call_args.args[0]
+            assert "search_query=cat:cs.AI" in request_url
+
+    @pytest.mark.asyncio
+    async def test_configured_category_list_replaces_legacy_category(self, mock_arxiv_response):
+        from src.config import ArxivSettings
+
+        client = ArxivClient(
+            ArxivSettings(
+                search_category="cs.AI",
+                search_categories=["cs.LG", "stat.ML"],
+                pdf_cache_dir="/tmp/test_arxiv_cache",
+            )
+        )
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_response = MagicMock()
+            mock_response.text = mock_arxiv_response
+            mock_response.raise_for_status.return_value = None
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+
+            await client.fetch_paperts(max_results=1)
+
+            request_url = mock_client.return_value.__aenter__.return_value.get.call_args.args[0]
+            search_query = parse_qs(urlparse(request_url).query)["search_query"][0]
+            assert "(cat:cs.LG OR cat:stat.ML)" in search_query
+            assert "cat:cs.AI" not in search_query
+
+    @pytest.mark.asyncio
+    async def test_max_results_remains_capped_at_arxiv_limit(self, arxiv_client, mock_arxiv_response):
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_response = MagicMock()
+            mock_response.text = mock_arxiv_response
+            mock_response.raise_for_status.return_value = None
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+
+            await arxiv_client.fetch_paperts(max_results=2500)
+
+            request_url = mock_client.return_value.__aenter__.return_value.get.call_args.args[0]
+            assert "max_results=2000" in request_url
 
     @pytest.mark.asyncio
     async def test_fetch_papers_http_timeout(self, arxiv_client):
@@ -97,7 +176,7 @@ class TestArxivClient:
             )
 
             with pytest.raises(ArxivAPITimeoutError) as exc_info:
-                await arxiv_client.fetch_papers(max_results=1)
+                await arxiv_client.fetch_paperts(max_results=1)
 
             assert "arXiv API request timed out" in str(exc_info.value)
 
@@ -112,7 +191,7 @@ class TestArxivClient:
             )
 
             with pytest.raises(ArxivAPIException) as exc_info:
-                await arxiv_client.fetch_papers(max_results=1)
+                await arxiv_client.fetch_paperts(max_results=1)
 
             assert "arXiv API returned error 500" in str(exc_info.value)
 

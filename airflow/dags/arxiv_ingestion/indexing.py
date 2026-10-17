@@ -57,7 +57,10 @@ def index_papers_hybrid(**context):
         with database.get_session() as session:
             from src.models.paper import Paper
 
-            if fetch_results and fetch_results.get("papers_stored", 0) > 0:
+            if fetch_results is not None and "arxiv_ids" in fetch_results:
+                arxiv_ids = fetch_results.get("arxiv_ids", [])
+                papers = session.query(Paper).filter(Paper.arxiv_id.in_(arxiv_ids)).all() if arxiv_ids else []
+            elif fetch_results and fetch_results.get("papers_stored", 0) > 0:
                 from sqlalchemy import desc
 
                 papers = session.query(Paper).order_by(desc(Paper.created_at)).limit(fetch_results["papers_stored"]).all()

@@ -77,3 +77,32 @@ def test_chunk_paper_uses_abstract_when_full_text_is_missing():
     assert len(chunks) == 1
     assert chunks[0].text == "This abstract describes a useful research method."
     assert chunks[0].metadata.word_count == 7
+
+
+@pytest.mark.asyncio
+async def test_metadata_only_paper_is_indexed_from_abstract():
+    abstract = "This abstract describes a useful research method."
+    embeddings = AsyncMock()
+    embeddings.embed_passages.return_value = [[0.1, 0.2]]
+    opensearch = MagicMock()
+    opensearch.bulk_index_chunks.return_value = {"success": 1, "failed": 0}
+    service = HybridIndexingService(
+        TextChunker(chunk_size=20, overlap_size=5, min_chunk_size=10), embeddings, opensearch
+    )
+
+    result = await service.index_paper(
+        {
+            "id": "db-paper-metadata-only",
+            "arxiv_id": "2501.00002",
+            "title": "Metadata-only paper",
+            "abstract": abstract,
+            "raw_text": None,
+            "sections": None,
+            "authors": ["A. Author"],
+            "categories": ["cs.AI"],
+        }
+    )
+
+    assert result["chunks_indexed"] == 1
+    embeddings.embed_passages.assert_awaited_once_with(texts=[abstract], batch_size=50)
+    assert opensearch.bulk_index_chunks.call_args.args[0][0]["chunk_data"]["chunk_text"] == abstract
