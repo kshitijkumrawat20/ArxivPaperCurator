@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from langchain_core.messages import HumanMessage
 from langfuse.langchain import CallbackHandler
@@ -70,9 +70,17 @@ class AgenticRAGService:
 
         # Build graph once (no runnables needed!)
         self.graph = self._build_graph()
+        self._graph_cache: Dict[Tuple[int, bool, Optional[Tuple[str, ...]]], object] = {
+            (self.graph_config.top_k, self.graph_config.use_hybrid, None): self.graph
+        }
         logger.info("✓ AgenticRAGService initialized successfully")
 
-    def _build_graph(self):
+    def _build_graph(
+        self,
+        top_k: Optional[int] = None,
+        use_hybrid: Optional[bool] = None,
+        categories: Optional[List[str]] = None,
+    ):
         """Build and compile the LangGraph workflow.
 
         Uses context_schema for type-safe dependency injection.
@@ -86,11 +94,14 @@ class AgenticRAGService:
         workflow = StateGraph(AgentState, context_schema=Context)
 
         # Create tools (these still need to be created upfront for ToolNode)
+        retrieval_top_k = top_k if top_k is not None else self.graph_config.top_k
+        retrieval_use_hybrid = use_hybrid if use_hybrid is not None else self.graph_config.use_hybrid
         retriever_tool = create_retriever_tool(
             opensearch_client=self.opensearch,
             embeddings_client=self.embeddings,
-            top_k=self.graph_config.top_k,
-            use_hybrid=self.graph_config.use_hybrid,
+            top_k=retrieval_top_k,
+            use_hybrid=retrieval_use_hybrid,
+            categories=categories,
         )
         tools = [retriever_tool]
 
@@ -164,6 +175,9 @@ class AgenticRAGService:
         query: str,
         user_id: str = "api_user",
         model: Optional[str] = None,
+        top_k: Optional[int] = None,
+        use_hybrid: Optional[bool] = None,
+        categories: Optional[List[str]] = None,
     ) -> dict:
         """Ask a question using agentic RAG.
 
@@ -174,6 +188,9 @@ class AgenticRAGService:
         :raises ValueError: If query is empty
         """
         model_to_use = model or self.graph_config.model
+        retrieval_top_k = top_k if top_k is not None else self.graph_config.top_k
+        retrieval_use_hybrid = use_hybrid if use_hybrid is not None else self.graph_config.use_hybrid
+        category_key = tuple(sorted(set(categories))) if categories else None
 
         logger.info("=" * 80)
         logger.info("Starting Agentic RAG Request")
@@ -187,6 +204,18 @@ class AgenticRAGService:
             logger.error("Empty query received")
             raise ValueError("Query cannot be empty")
 
+        graph_key = (retrieval_top_k, retrieval_use_hybrid, category_key)
+        graph = self._graph_cache.get(graph_key)
+        if graph is None:
+            graph = self._build_graph(
+                top_k=retrieval_top_k,
+                use_hybrid=retrieval_use_hybrid,
+                categories=list(category_key) if category_key else None,
+            )
+            if len(self._graph_cache) >= 32:
+                self._graph_cache.pop(next(iter(self._graph_cache)))
+            self._graph_cache[graph_key] = graph
+
         # Create trace if Langfuse is enabled (v3 SDK)
         trace = None
         if self.langfuse_tracer and self.langfuse_tracer.client:
@@ -194,8 +223,9 @@ class AgenticRAGService:
             metadata = {
                 "env": self.graph_config.settings.environment,
                 "service": "agentic_rag",
-                "top_k": self.graph_config.top_k,
-                "use_hybrid": self.graph_config.use_hybrid,
+                "top_k": retrieval_top_k,
+                "use_hybrid": retrieval_use_hybrid,
+                "categories": list(category_key) if category_key else [],
                 "model": model_to_use,
                 "user_id": user_id,
                 "session_id": f"session_{user_id}",
@@ -217,9 +247,13 @@ class AgenticRAGService:
                         input={"query": query},
                     )
                     logger.debug(f"Trace created: {trace_obj}")
-                    return await self._run_workflow(query, model_to_use, user_id, trace_obj)
+                    return await self._run_workflow(
+                        query, model_to_use, user_id, trace_obj, graph, retrieval_top_k
+                    )
             else:
-                return await self._run_workflow(query, model_to_use, user_id, None)
+                return await self._run_workflow(
+                    query, model_to_use, user_id, None, graph, retrieval_top_k
+                )
 
         try:
             return await _execute_with_trace()
@@ -228,7 +262,15 @@ class AgenticRAGService:
             logger.exception("Full traceback:")
             raise
 
-    async def _run_workflow(self, query: str, model_to_use: str, user_id: str, trace) -> dict:
+    async def _run_workflow(
+        self,
+        query: str,
+        model_to_use: str,
+        user_id: str,
+        trace,
+        graph,
+        top_k: int,
+    ) -> dict:
         """Execute the workflow with the given trace context."""
         try:
             start_time = time.time()
@@ -260,7 +302,7 @@ class AgenticRAGService:
                 langfuse_enabled=self.langfuse_tracer is not None and self.langfuse_tracer.client is not None,
                 model_name=model_to_use,
                 temperature=self.graph_config.temperature,
-                top_k=self.graph_config.top_k,
+                top_k=top_k,
                 max_retrieval_attempts=self.graph_config.max_retrieval_attempts,
                 guardrail_threshold=self.graph_config.guardrail_threshold,
             )
@@ -280,7 +322,7 @@ class AgenticRAGService:
                 except Exception as e:
                     logger.warning(f"Failed to create CallbackHandler: {e}")
 
-            result = await self.graph.ainvoke(
+            result = await graph.ainvoke(
                 state_input,
                 config=config,
                 context=runtime_context,

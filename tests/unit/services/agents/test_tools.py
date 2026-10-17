@@ -81,6 +81,24 @@ async def test_retriever_tool_custom_top_k(mock_opensearch_client, mock_jina_emb
 
 
 @pytest.mark.asyncio
+async def test_retriever_tool_applies_categories_and_skips_embedding_for_bm25(
+    mock_opensearch_client, mock_jina_embeddings_client
+):
+    categories = ["cs.AI", "cs.LG"]
+    tool = create_retriever_tool(
+        opensearch_client=mock_opensearch_client,
+        embeddings_client=mock_jina_embeddings_client,
+        use_hybrid=False,
+        categories=categories,
+    )
+
+    await tool.ainvoke({"query": "model compression"})
+
+    mock_jina_embeddings_client.embed_query.assert_not_called()
+    assert mock_opensearch_client.search_unified.call_args.kwargs["categories"] == categories
+
+
+@pytest.mark.asyncio
 async def test_retriever_tool_metadata_fields(mock_opensearch_client, mock_jina_embeddings_client):
     """Test that all expected metadata fields are present."""
     from unittest.mock import Mock

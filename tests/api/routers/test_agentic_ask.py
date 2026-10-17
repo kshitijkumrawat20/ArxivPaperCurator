@@ -203,6 +203,38 @@ class TestAgenticAskEndpoint:
         call_kwargs = mock_agentic_rag_service.ask.call_args.kwargs
         assert call_kwargs["model"] == "llama3.2:3b"
 
+    def test_ask_agentic_passes_retrieval_options(self, client, mock_agentic_rag_service):
+        response = client.post(
+            "/api/v1/ask-agentic",
+            json={
+                "query": "How can models be compressed?",
+                "top_k": 7,
+                "use_hybrid": False,
+                "categories": ["cs.AI", "cs.LG"],
+            },
+        )
+
+        assert response.status_code == 200
+        call_kwargs = mock_agentic_rag_service.ask.call_args.kwargs
+        assert call_kwargs["top_k"] == 7
+        assert call_kwargs["use_hybrid"] is False
+        assert call_kwargs["categories"] == ["cs.AI", "cs.LG"]
+
+    def test_feedback_uses_comments_from_request(self, client):
+        tracer = Mock()
+        tracer.submit_feedback.return_value = True
+        app.dependency_overrides[dependencies.get_langfuse_tracer] = lambda: tracer
+
+        response = client.post(
+            "/api/v1/feedback",
+            json={"trace_id": "trace-123", "score": 0.8, "comments": "Useful answer"},
+        )
+
+        assert response.status_code == 200
+        tracer.submit_feedback.assert_called_once_with(
+            trace_id="trace-123", score=0.8, comment="Useful answer"
+        )
+
     def test_ask_agentic_search_mode_hybrid(self, client, mock_agentic_rag_service):
         """Test that search_mode is set correctly for hybrid search."""
         response = client.post(

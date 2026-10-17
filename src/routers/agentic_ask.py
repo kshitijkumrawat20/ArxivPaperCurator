@@ -40,6 +40,9 @@ async def ask_agentic(
         result = await agentic_rag.ask(
             query=request.query,
             model=request.model,
+            top_k=request.top_k,
+            use_hybrid=request.use_hybrid,
+            categories=request.categories,
         )
 
         return AgenticAskResponse(
@@ -90,7 +93,7 @@ async def submit_feedback(
         success = langfuse_tracer.submit_feedback(
             trace_id=request.trace_id,
             score=request.score,
-            comment=request.comment,
+            comment=request.comments,
         )
 
         if success:

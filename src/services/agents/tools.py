@@ -1,4 +1,5 @@
 import logging
+from typing import List, Optional
 from langchain_core.documents import Document
 from langchain_core.tools import tool 
 from src.services.embeddings.jina_client import JinaEmbeddingsClient 
@@ -11,6 +12,7 @@ def create_retriever_tool(
         embeddings_client: JinaEmbeddingsClient, 
         top_k: int = 3 , 
         use_hybrid: bool = True, 
+        categories: Optional[List[str]] = None,
 ):
     """Create a retriever tool that wraps OpenSearch service.
 
@@ -18,6 +20,7 @@ def create_retriever_tool(
     :param embeddings_client: Existing Jina embeddings service
     :param top_k: Number of chunks to retrieve
     :param use_hybrid: Use hybrid search (BM25 + vector)
+    :param categories: Optional arXiv categories to filter retrieval
     :returns: LangChain tool for retrieving papers
     """
 
@@ -39,10 +42,11 @@ def create_retriever_tool(
         logger.info(f"Retrieving papers for query: {query[:100]}...")
         logger.debug(f"Search mode: {'hybrid' if use_hybrid else 'bm25'}, top_k: {top_k}")
 
-        # genrate query embeddings 
-        logger.debug("Generating query embeddings...")
-        query_embedding = await embeddings_client.embed_query(query)
-        logger.debug(f"Genrated embedding with {len(query_embedding)} dimensions")
+        query_embedding = None
+        if use_hybrid:
+            logger.debug("Generating query embeddings...")
+            query_embedding = await embeddings_client.embed_query(query)
+            logger.debug(f"Generated embedding with {len(query_embedding)} dimensions")
 
         # Search using OpenSearch 
         logger.debug("Searching OpenSearch...")
@@ -50,6 +54,7 @@ def create_retriever_tool(
             query = query, 
             query_embedding = query_embedding, 
             size = top_k, 
+            categories = categories,
             use_hybrid = use_hybrid,
         )
 

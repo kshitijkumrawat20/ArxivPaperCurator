@@ -89,6 +89,27 @@ class TestAgenticRAGAskMethod:
         # Verify graph was called
         test_service.graph.ainvoke.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_ask_builds_graph_with_request_retrieval_options(self, test_service):
+        alternate_graph = Mock()
+        test_service._build_graph = Mock(return_value=alternate_graph)
+        test_service._run_workflow = AsyncMock(return_value={"answer": "ok"})
+
+        result = await test_service.ask(
+            query="How can model inference be accelerated?",
+            top_k=6,
+            use_hybrid=False,
+            categories=["cs.LG", "cs.AI"],
+        )
+
+        assert result == {"answer": "ok"}
+        test_service._build_graph.assert_called_once_with(
+            top_k=6,
+            use_hybrid=False,
+            categories=["cs.AI", "cs.LG"],
+        )
+        assert test_service._run_workflow.call_args.args[4:] == (alternate_graph, 6)
+
 
 class TestAgenticRAGGraphVisualization:
     """Tests for graph visualization methods."""
