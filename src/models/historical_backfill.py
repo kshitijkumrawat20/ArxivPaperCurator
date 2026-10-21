@@ -30,3 +30,19 @@ class HistoricalBackfillCheckpoint(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+
+class MetadataIndexSyncCheckpoint(Base):
+    """Independent cursor for PostgreSQL-to-OpenSearch metadata synchronization."""
+
+    __tablename__ = "metadata_index_sync_checkpoints"
+
+    job_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    last_arxiv_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    records_indexed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

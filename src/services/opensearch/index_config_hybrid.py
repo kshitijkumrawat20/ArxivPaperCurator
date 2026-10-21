@@ -5,6 +5,7 @@ using HNSW algorithm for approximate nearest neighbor search.
 """
 
 ARXIV_PAPERS_CHUNKS_INDEX = "arxiv-papers-chunks"
+ARXIV_PAPERS_METADATA_INDEX = "arxiv-papers-metadata"
 
 # Index mapping for chunked papers with vector embeddings
 ARXIV_PAPERS_CHUNKS_MAPPING = {
@@ -64,6 +65,33 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
             "section_title": {"type": "keyword"},
             "embedding_model": {"type": "keyword"},
             "created_at": {"type": "date"},
+            "updated_at": {"type": "date"},
+        },
+    },
+}
+
+# Paper-level lexical discovery index. Deliberately has no vector field so metadata
+# discovery never depends on embedding generation or the chunk index lifecycle.
+ARXIV_PAPERS_METADATA_MAPPING = {
+    "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
+        "analysis": {
+            "analyzer": {
+                "metadata_text": {"type": "custom", "tokenizer": "standard", "filter": ["lowercase", "stop", "snowball"]}
+            }
+        },
+    },
+    "mappings": {
+        "dynamic": "strict",
+        "properties": {
+            "arxiv_id": {"type": "keyword"},
+            "title": {"type": "text", "analyzer": "metadata_text"},
+            "abstract": {"type": "text", "analyzer": "metadata_text"},
+            "authors": {"type": "text", "analyzer": "standard"},
+            "categories": {"type": "keyword"},
+            "published_date": {"type": "date"},
+            "pdf_url": {"type": "keyword", "index": False},
             "updated_at": {"type": "date"},
         },
     },

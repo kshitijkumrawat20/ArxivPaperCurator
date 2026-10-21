@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.db.factory import make_database
 from src.services.indexing.factory import make_hybrid_indexing_service
+from src.services.metadata_indexing import MetadataIndexingService
 from src.services.opensearch.factory import make_opensearch_client_fresh
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,39 @@ def index_papers_hybrid(**context):
     except Exception as e:
         logger.error(f"Failed to index papers for hybrid search: {e}")
         raise
+
+
+def index_papers_metadata(**context):
+    """Independently upsert fetched paper metadata into the BM25 discovery index."""
+    database = make_database()
+    ti = context.get("ti")
+    fetch_results = ti.xcom_pull(task_ids="fetch_daily_papers", key="fetch_results") if ti else None
+    arxiv_ids = (fetch_results or {}).get("arxiv_ids", [])
+    try:
+        with database.get_session() as session:
+            from src.respositories.paper import PaperRepository
+
+            papers = PaperRepository(session).get_by_arxiv_ids(arxiv_ids)
+            indexing = MetadataIndexingService(make_opensearch_client_fresh())
+            succeeded = failed = 0
+            for start in range(0, len(papers), indexing.batch_size):
+                batch = papers[start : start + indexing.batch_size]
+                result = indexing.index_batch(batch)
+                succeeded += result["success"]
+                failed += result["failed"]
+                if result["failed"]:
+                    logger.error(
+                        "Metadata indexing partially failed: %s succeeded, %s failed; retry or run bounded DB sync",
+                        succeeded,
+                        failed,
+                    )
+                    raise RuntimeError(f"Metadata indexing batch had {result['failed']} failed document(s)")
+            stats = {"papers_indexed": succeeded, "papers_failed": failed}
+            if ti:
+                ti.xcom_push(key="metadata_index_stats", value=stats)
+            return stats
+    finally:
+        database.teardown()
 
 
 def verify_hybrid_index(**context):

@@ -1,4 +1,5 @@
-from typing import List, Optional 
+from datetime import date
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 class SearchRequest(BaseModel):
@@ -8,6 +9,29 @@ class SearchRequest(BaseModel):
     from_: int = Field(default = 0, ge = 0, alias = "from", description = "Offset for pagination, starting from 0" )
     categories: Optional[List[str]] = Field(default = None, description = "List of categories to filter the search results")
     latest_papers: bool = Field(default = False, description = "sort by publicaiton date(newest first) if True, else sort by relevance")
+
+
+class MetadataDiscoveryHit(BaseModel):
+    arxiv_id: str
+    title: str
+    abstract: str
+    authors: List[str]
+    categories: List[str]
+    published_date: str
+    pdf_url: str
+    source_url: str
+    score: Optional[float] = None
+
+
+class MetadataDiscoveryResponse(BaseModel):
+    query: str
+    total: int
+    size: int
+    from_: int = Field(alias="from")
+    papers: List[MetadataDiscoveryHit]
+
+    class Config:
+        populate_by_name = True
 
 class HybridSearchRequest(BaseModel):
     """Request model for hybrid search supporting all search modes"""
@@ -60,4 +84,4 @@ class SearchResponse(BaseModel):
     error: Optional[str] = None
 
     class Config:
-        populate_by_name = True  
+        populate_by_name = True

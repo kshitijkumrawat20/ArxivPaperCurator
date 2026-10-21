@@ -5,8 +5,13 @@ from typing import Any, Dict, List, Optional
 
 from opensearchpy import OpenSearch
 from src.config import Settings
+from src.services.metadata_indexing import build_metadata_document, build_metadata_index_action
 
-from .index_config_hybrid import ARXIV_PAPERS_CHUNKS_MAPPING, HYBRID_RRF_PIPELINE
+from .index_config_hybrid import (
+    ARXIV_PAPERS_CHUNKS_MAPPING,
+    ARXIV_PAPERS_METADATA_MAPPING,
+    HYBRID_RRF_PIPELINE,
+)
 from .query_builder import QueryBuilder
 
 logger = logging.getLogger(__name__)
@@ -19,6 +24,7 @@ class OpenSearchClient:
         self.host = host
         self.settings = settings
         self.index_name = f"{settings.opensearch.index_name}-{settings.opensearch.chunk_index_suffix}"
+        self.metadata_index_name = f"{settings.opensearch.index_name}-{settings.opensearch.metadata_index_suffix}"
 
         self.client = OpenSearch(
             hosts=[host],
@@ -60,11 +66,49 @@ class OpenSearchClient:
             return {"index_name": self.index_name, "exists": False, "document_count": 0, "error": str(e)}
 
     def setup_indices(self, force: bool = False) -> Dict[str, bool]:
-        """Setup the hybrid search index and RRF pipeline."""
+        """Setup both search indexes and the hybrid RRF pipeline."""
         results = {}
         results["hybrid_index"] = self._create_hybrid_index(force)
         results["rrf_pipeline"] = self._create_rrf_pipeline(force)
+        results["metadata_index"] = self._create_metadata_index(force)
         return results
+
+    def _create_metadata_index(self, force: bool = False) -> bool:
+        """Create the independent, vector-free paper metadata index."""
+        try:
+            if force and self.client.indices.exists(index=self.metadata_index_name):
+                self.client.indices.delete(index=self.metadata_index_name)
+            if not self.client.indices.exists(index=self.metadata_index_name):
+                self.client.indices.create(index=self.metadata_index_name, body=ARXIV_PAPERS_METADATA_MAPPING)
+                return True
+            return False
+        except Exception as exc:
+            # Metadata discovery is additive; do not take down the established
+            # chunk/hybrid index startup if its separate index cannot be prepared.
+            logger.error("Could not initialize metadata discovery index (%s)", type(exc).__name__)
+            return False
+
+    def index_paper_metadata(self, paper: Any) -> bool:
+        """Idempotently index one PostgreSQL paper using its exact arXiv ID."""
+        try:
+            doc = build_metadata_document(paper)
+            response = self.client.index(index=self.metadata_index_name, id=doc["arxiv_id"], body=doc, refresh=True)
+            return response.get("result") in {"created", "updated", "noop"}
+        except Exception as exc:
+            logger.warning("Metadata indexing failed (%s)", type(exc).__name__)
+            return False
+
+    def bulk_index_paper_metadata(self, papers: List[Any]) -> Dict[str, Any]:
+        """Bulk upsert metadata documents, returning per-record failures for retry."""
+        from opensearchpy import helpers
+
+        actions = [build_metadata_index_action(paper, self.metadata_index_name) for paper in papers]
+        success, failed = helpers.bulk(self.client, actions, refresh=True, raise_on_error=False)
+        return {"success": success, "failed": len(failed), "errors": failed}
+
+    def search_paper_metadata(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Search the paper-level metadata index using a prebuilt BM25 query."""
+        return self.client.search(index=self.metadata_index_name, body=body)
 
     def _create_hybrid_index(self, force: bool = False) -> bool:
         """Create hybrid index for all search types (BM25, vector, hybrid).

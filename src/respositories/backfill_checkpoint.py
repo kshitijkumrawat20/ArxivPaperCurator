@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.models.historical_backfill import HistoricalBackfillCheckpoint
+from src.models.historical_backfill import HistoricalBackfillCheckpoint, MetadataIndexSyncCheckpoint
 
 
 class BackfillCheckpointRepository:
@@ -23,6 +23,28 @@ class BackfillCheckpointRepository:
         return checkpoint
 
     def save(self, checkpoint: HistoricalBackfillCheckpoint) -> HistoricalBackfillCheckpoint:
+        saved = self.session.merge(checkpoint)
+        self.session.commit()
+        self.session.refresh(saved)
+        return saved
+
+
+class MetadataIndexSyncCheckpointRepository:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def get(self, job_id: str) -> MetadataIndexSyncCheckpoint | None:
+        return self.session.scalar(
+            select(MetadataIndexSyncCheckpoint).where(MetadataIndexSyncCheckpoint.job_id == job_id)
+        )
+
+    def create(self, checkpoint: MetadataIndexSyncCheckpoint) -> MetadataIndexSyncCheckpoint:
+        self.session.add(checkpoint)
+        self.session.commit()
+        self.session.refresh(checkpoint)
+        return checkpoint
+
+    def save(self, checkpoint: MetadataIndexSyncCheckpoint) -> MetadataIndexSyncCheckpoint:
         saved = self.session.merge(checkpoint)
         self.session.commit()
         self.session.refresh(saved)

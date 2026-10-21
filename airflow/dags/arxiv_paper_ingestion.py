@@ -4,7 +4,7 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from arxiv_ingestion.fetching import fetch_daily_papers
-from arxiv_ingestion.indexing import index_papers_hybrid, verify_hybrid_index
+from arxiv_ingestion.indexing import index_papers_hybrid, index_papers_metadata, verify_hybrid_index
 from arxiv_ingestion.reporting import generate_daily_report
 
 # Import task functions from separate module
@@ -57,6 +57,12 @@ index_hybrid_task = PythonOperator(
     dag=dag,
 )
 
+index_metadata_task = PythonOperator(
+    task_id="index_papers_metadata",
+    python_callable=index_papers_metadata,
+    dag=dag,
+)
+
 report_task = PythonOperator(
     task_id="generate_daily_report",
     python_callable=generate_daily_report,
@@ -76,4 +82,4 @@ cleanup_task = BashOperator(
 
 # Task dependencies
 # Main pipeline: setup -> fetch -> (retry + index_hybrid) -> report -> cleanup
-setup_task >> fetch_task >> index_hybrid_task >> report_task >> cleanup_task
+setup_task >> fetch_task >> [index_metadata_task, index_hybrid_task] >> report_task >> cleanup_task

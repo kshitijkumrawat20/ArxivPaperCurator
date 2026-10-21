@@ -100,6 +100,7 @@ class OpenSearchSettings(BaseConfigSettings):
     host: str = "http://localhost:9200"
     index_name: str = "arxiv-papers"
     chunk_index_suffix : str = "chunks" # create single hybrid index: {index_name}-{chunk_index_suffix}
+    metadata_index_suffix: str = "metadata"
     max_text_size: int = 1000000
 
     # Vector search settings 

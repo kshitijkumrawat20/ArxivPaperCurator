@@ -31,6 +31,19 @@ class PaperRepository:
     def get_all(self, limit: int = 100, offset: int = 0) -> List[Paper]:
         stmt = select(Paper).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
         return self.session.scalars(stmt).all()
+
+    def get_metadata_batch_after(self, arxiv_id: Optional[str], limit: int = 100) -> List[Paper]:
+        """Read a bounded, stable keyset page without refetching records from arXiv."""
+        stmt = select(Paper).order_by(Paper.arxiv_id.asc()).limit(limit)
+        if arxiv_id is not None:
+            stmt = stmt.where(Paper.arxiv_id > arxiv_id)
+        return list(self.session.scalars(stmt))
+
+    def get_by_arxiv_ids(self, arxiv_ids: list[str]) -> List[Paper]:
+        if not arxiv_ids:
+            return []
+        stmt = select(Paper).where(Paper.arxiv_id.in_(arxiv_ids))
+        return list(self.session.scalars(stmt))
         # return self.session.query(Paper).order_by(Paper.published_date.desc()).limit(limit).offset(offset).all()
 
     def get_count(self) -> int:
