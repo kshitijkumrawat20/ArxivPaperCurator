@@ -47,6 +47,10 @@ class PostgresSQLDatabase(BaseDatabase):
             existing_tables = inspector.get_table_names() # Get the list of existing tables in the database.
 
             # creating tables if not exist in the database 
+            # Register all model tables before create_all inspects the shared metadata.
+            import src.models.historical_backfill  # noqa: F401
+            import src.models.paper  # noqa: F401
+
             Base.metadata.create_all(bind = self.engine) # Create all tables defined in the SQLAlchemy models if they do not already exist in the database.Base is the declarative base class that contains the metadata for all the models.
 
             # check if tany tables is created 
