@@ -88,6 +88,20 @@ class ChunkingSettings(BaseConfigSettings):
     min_chunk_size: int = 100
     section_based : bool = True # Use section based chunking when availables    
 
+
+class DeepDiveSettings(BaseConfigSettings):
+    """Server-side bounds for a single paper Deep Dive request."""
+    model_config = SettingsConfigDict(
+        env_file=[".env", str(ENV_FILE_PATH)],
+        env_prefix="DEEP_DIVE__",
+        extra="ignore",
+        frozen=True,
+        case_sensitive=False,
+    )
+    max_chunks: int = Field(default=10, ge=1, le=10)
+    max_prompt_chars: int = Field(default=24000, ge=2000, le=100000)
+    max_chunk_chars: int = Field(default=5000, ge=500, le=20000)
+
 class OpenSearchSettings(BaseConfigSettings):
     """OpenSearch settings."""
     model_config = SettingsConfigDict(
@@ -192,6 +206,8 @@ class Settings(BaseConfigSettings):
     pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings) 
 
     chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
+
+    deep_dive: DeepDiveSettings = Field(default_factory=DeepDiveSettings)
 
     # OpenSearch settings
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)

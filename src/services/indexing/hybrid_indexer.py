@@ -97,6 +97,7 @@ class HybridIndexingService:
                     "arxiv_id": arxiv_id,
                     "paper_id": paper_id,
                     "chunk_index": chunk.metadata.chunk_index,
+                    "section_title": chunk.metadata.section_title,
                     "chunk_text": chunk.text,
                     "chunk_word_count": chunk.metadata.word_count,
                     "start_char": chunk.metadata.start_char,

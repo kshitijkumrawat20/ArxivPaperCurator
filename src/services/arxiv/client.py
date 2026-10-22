@@ -372,6 +372,28 @@ class ArxivClient:
             return pdf_path
         else:
             return None
+
+    async def download_paper_pdf(
+        self, arxiv_id: str, force_download: bool = False, max_file_size_bytes: Optional[int] = None
+    ) -> Optional[Path]:
+        """Download an exact stored arXiv ID/version using the existing retry/cache path.
+
+        Unlike ``fetch_paper_by_id``, this intentionally does not strip ``vN`` or
+        look up the latest version before constructing the PDF URL.
+        """
+        if not arxiv_id or arxiv_id.strip() != arxiv_id:
+            raise ValueError("A non-empty exact arXiv ID is required")
+
+        pdf_path = self._get_pdf_path(arxiv_id)
+        if pdf_path.exists() and not force_download:
+            logger.info("Using cached PDF for exact arXiv ID %s", arxiv_id)
+            return pdf_path
+
+        safe_id = quote(arxiv_id, safe="/.")
+        url = f"https://arxiv.org/pdf/{safe_id}.pdf"
+        if await self._download_with_retry(url, pdf_path, max_file_size_bytes=max_file_size_bytes):
+            return pdf_path
+        return None
         
     def _get_pdf_path(self, arxiv_id: str) -> Path:
         """
@@ -387,7 +409,10 @@ class ArxivClient:
         return self.pdf_cache_dir / safe_filename
     
 
-    async def _download_with_retry(self, url: str, path: Path, max_retries: Optional[int] = None) -> bool:
+    async def _download_with_retry(
+        self, url: str, path: Path, max_retries: Optional[int] = None,
+        max_file_size_bytes: Optional[int] = None,
+    ) -> bool:
         """
         Download a file with retry logic.
 
@@ -412,8 +437,16 @@ class ArxivClient:
                 async with httpx.AsyncClient(timeout=float(self.timeout_seconds)) as client:
                     async with client.stream("GET", url) as response:
                         response.raise_for_status()
+                        content_length = response.headers.get("content-length")
+                        if max_file_size_bytes is not None and content_length:
+                            if int(content_length) > max_file_size_bytes:
+                                raise ValueError("PDF exceeds configured maximum file size")
+                        bytes_written = 0
                         with open(path, "wb") as f:
                             async for chunk in response.aiter_bytes():
+                                bytes_written += len(chunk)
+                                if max_file_size_bytes is not None and bytes_written > max_file_size_bytes:
+                                    raise ValueError("PDF exceeds configured maximum file size")
                                 f.write(chunk)
                 logger.info(f"Successfully downloaded to {path.name}")
                 return True
@@ -425,6 +458,8 @@ class ArxivClient:
                     logger.info(f"Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)
                 else:
+                    if path.exists():
+                        path.unlink()
                     logger.error(f"PDF download failed after {max_retries} attempts due to timeout: {e}")
                     raise PDFDownloadTimeoutError(f"PDF download timed out after {max_retries} attempts: {e}")
             except httpx.HTTPError as e:
@@ -434,9 +469,13 @@ class ArxivClient:
                     logger.info(f"Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)
                 else:
+                    if path.exists():
+                        path.unlink()
                     logger.error(f"Failed after {max_retries} attempts: {e}")
                     raise PDFDownloadException(f"PDF download failed after {max_retries} attempts: {e}")
             except Exception as e:
+                if path.exists():
+                    path.unlink()
                 logger.error(f"Unexpected download error: {e}")
                 raise PDFDownloadException(f"Unexpected error during PDF download: {e}")
 

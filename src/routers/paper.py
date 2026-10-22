@@ -2,8 +2,13 @@ from datetime import date
 
 from fastapi import APIRouter, Depends , HTTPException, Path, Query
 from sqlalchemy.orm import Session
-from src.dependencies import CacheDep, EmbeddingsDep, LangfuseDep, OllamaDep, OpenSearchDep, SessionDep
+from src.dependencies import (
+    ArxivDep, CacheDep, EmbeddingsDep, LangfuseDep, OllamaDep, OpenSearchDep,
+    PDFParserDep, SessionDep, SettingsDep,
+)
 from src.schema.api.ask import PaperAskRequest, PaperAskResponse
+from src.schema.api.deep_dive import PaperDeepDiveRequest, PaperDeepDiveResponse, PaperPreparationResponse
+from src.schema.api.project_match import ProjectMatchRequest, ProjectMatchResponse
 from src.schema.arxiv.paper import PaperResponse, PaperSearchResponse
 from src.schema.api.search import MetadataDiscoveryResponse
 from src.respositories.paper import PaperRepository 
@@ -16,6 +21,27 @@ from src.services.paper_scoped_rag import (
     PaperSearchUnavailableError,
 )
 from src.services.langfuse.tracer import RAGTracer
+from src.respositories.paper_brief import PaperBriefRepository
+from src.services.indexing.hybrid_indexer import HybridIndexingService
+from src.services.indexing.text_chunker import TextChunker
+from src.services.paper_preparation import (
+    PaperPreparationDownloadError,
+    PaperPreparationIndexingError,
+    PaperPreparationNotFoundError,
+    PaperPreparationParsingError,
+    PaperPreparationService,
+    PaperPreparationStorageError,
+)
+from src.services.paper_deep_dive import (
+    PaperDeepDiveGenerationUnavailableError,
+    PaperDeepDiveInsufficientEvidenceError,
+    PaperDeepDiveNotFoundError,
+    PaperDeepDiveNotPreparedError,
+    PaperDeepDivePersistenceError,
+    PaperDeepDiveSearchUnavailableError,
+    PaperDeepDiveService,
+)
+from src.services.project_paper_match import ProjectMatchSearchUnavailableError, ProjectPaperMatchService
 
 router = APIRouter(prefix = "/papers", tags=["Papers"])
 @router.get("/", response_model=PaperSearchResponse)
@@ -57,6 +83,105 @@ def discover_papers(
         **{"from": offset},
         papers=result["hits"],
     )
+
+
+@router.post("/match-project", response_model=ProjectMatchResponse)
+def match_project_to_papers(
+    request: ProjectMatchRequest,
+    opensearch: OpenSearchDep,
+) -> ProjectMatchResponse:
+    """Rank papers from the vector-free metadata index for a project description."""
+    try:
+        return ProjectPaperMatchService(opensearch).match(request)
+    except ProjectMatchSearchUnavailableError as exc:
+        # Don't expose internal OpenSearch details or fall back to global chunk search.
+        raise HTTPException(
+            status_code=503,
+            detail="Project matching is temporarily unavailable because metadata search failed.",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Project matching is temporarily unavailable.") from exc
+
+
+@router.post("/{arxiv_id}/prepare", response_model=PaperPreparationResponse)
+async def prepare_paper(
+    arxiv_id: str,
+    db: SessionDep,
+    arxiv: ArxivDep,
+    pdf_parser: PDFParserDep,
+    embeddings: EmbeddingsDep,
+    opensearch: OpenSearchDep,
+    settings: SettingsDep,
+) -> PaperPreparationResponse:
+    """Download/parse/index only the selected exact paper version, on demand."""
+    chunker = TextChunker(
+        chunk_size=settings.chunking.chunk_size,
+        overlap_size=settings.chunking.overlap_size,
+        min_chunk_size=settings.chunking.min_chunk_size,
+    )
+    indexer = HybridIndexingService(chunker, embeddings, opensearch)
+    service = PaperPreparationService(
+        PaperRepository(db), arxiv, pdf_parser, indexer, opensearch, settings=settings
+    )
+    try:
+        return PaperPreparationResponse(**(await service.prepare(arxiv_id)))
+    except PaperPreparationNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Paper {arxiv_id!r} was not found") from exc
+    except PaperPreparationDownloadError as exc:
+        raise HTTPException(status_code=502, detail={"code": "pdf_download_failed", "message": str(exc)}) from exc
+    except PaperPreparationParsingError as exc:
+        raise HTTPException(status_code=422, detail={"code": "pdf_parsing_failed", "message": str(exc)}) from exc
+    except PaperPreparationStorageError as exc:
+        raise HTTPException(status_code=503, detail={"code": "parsed_content_not_saved", "message": str(exc)}) from exc
+    except PaperPreparationIndexingError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "parsed_not_indexed",
+                "message": str(exc),
+                "parsed_content_saved": exc.parsed_saved,
+                "retry": "Repeat this request to retry indexing saved parsed content; PDF parsing will be skipped.",
+                "indexing_stats": exc.stats,
+            },
+        ) from exc
+
+
+@router.post("/{arxiv_id}/deep-dive", response_model=PaperDeepDiveResponse)
+async def paper_deep_dive(
+    arxiv_id: str,
+    request: PaperDeepDiveRequest,
+    db: SessionDep,
+    opensearch: OpenSearchDep,
+    embeddings: EmbeddingsDep,
+    ollama: OllamaDep,
+    settings: SettingsDep,
+) -> PaperDeepDiveResponse:
+    """Generate/reuse a validated brief from this paper's retrieved full-text chunks only."""
+    service = PaperDeepDiveService(
+        paper_repository=PaperRepository(db),
+        brief_repository=PaperBriefRepository(db),
+        opensearch_client=opensearch,
+        embeddings_service=embeddings,
+        ollama_client=ollama,
+        settings=settings,
+    )
+    try:
+        return await service.generate(arxiv_id, request)
+    except PaperDeepDiveNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Paper {arxiv_id!r} was not found") from exc
+    except PaperDeepDiveNotPreparedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "paper_not_prepared", "message": "Prepare this paper's full text before requesting a Deep Dive."},
+        ) from exc
+    except PaperDeepDiveInsufficientEvidenceError as exc:
+        raise HTTPException(status_code=422, detail={"code": "insufficient_evidence", "message": str(exc)}) from exc
+    except PaperDeepDiveSearchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail={"code": "paper_search_unavailable", "message": str(exc)}) from exc
+    except PaperDeepDiveGenerationUnavailableError as exc:
+        raise HTTPException(status_code=503, detail={"code": "generation_unavailable", "message": str(exc)}) from exc
+    except PaperDeepDivePersistenceError as exc:
+        raise HTTPException(status_code=503, detail={"code": "brief_persistence_unavailable", "message": str(exc)}) from exc
 
 
 @router.post("/{arxiv_id}/ask", response_model=PaperAskResponse)

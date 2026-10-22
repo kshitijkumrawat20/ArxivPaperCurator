@@ -50,6 +50,7 @@ class PostgresSQLDatabase(BaseDatabase):
             # Register all model tables before create_all inspects the shared metadata.
             import src.models.historical_backfill  # noqa: F401
             import src.models.paper  # noqa: F401
+            import src.models.paper_brief  # noqa: F401
 
             Base.metadata.create_all(bind = self.engine) # Create all tables defined in the SQLAlchemy models if they do not already exist in the database.Base is the declarative base class that contains the metadata for all the models.
 

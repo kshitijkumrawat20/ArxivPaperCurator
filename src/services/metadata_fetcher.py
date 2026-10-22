@@ -11,8 +11,8 @@ from src.respositories.paper import PaperRepository
 from src.schema.arxiv.paper import ArxivPaper, PaperCreate
 from src.schema.pdf_parser.models import ArxivMetadata, ParsedPaper, PdfContent
 from src.services.arxiv.client import ArxivClient
-from src.services.opensearch.client import OpenSearchClient
 from src.services.pdf_parser.parser import PDFParserService
+from src.services.parsed_content import serialize_parsed_content
 
 logger = logging.getLogger(__name__)
 
@@ -323,27 +323,7 @@ class MetadataFetcher:
         :returns: Dictionary with serialized content for database storage
         :rtype: Dict[str, Any]
         """
-        try:
-            pdf_content = parsed_paper.pdf_content
-
-            # Serialize sections
-            sections = [{"title": section.title, "content": section.content} for section in pdf_content.sections]
-
-            # Serialize references
-            references = list(pdf_content.references)  #
-
-            return {
-                "raw_text": pdf_content.raw_text,
-                "sections": sections,
-                "references": references,
-                "parser_used": pdf_content.parser_used.value if pdf_content.parser_used else None,
-                "parser_metadata": pdf_content.metadata or {},
-                "pdf_processed": True,
-                "pdf_processing_date": datetime.now(),
-            }
-        except Exception as e:
-            logger.error(f"Failed to serialize parsed content: {e}")
-            return {"pdf_processed": False, "parser_metadata": {"error": str(e)}}
+        return serialize_parsed_content(parsed_paper)
 
     def _store_papers_to_db(
         self,

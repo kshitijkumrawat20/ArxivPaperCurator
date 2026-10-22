@@ -433,7 +433,7 @@ class OpenSearchClient:
             logger.error(f"Bulk chunk indexing error: {e}")
             raise
 
-    def delete_paper_chunks(self, arxiv_id: str) -> bool:
+    def delete_paper_chunks(self, arxiv_id: str, raise_errors: bool = False) -> bool:
         """Delete all chunks for a specific paper.
 
         :param arxiv_id: ArXiv ID of the paper
@@ -450,6 +450,8 @@ class OpenSearchClient:
 
         except Exception as e:
             logger.error(f"Error deleting chunks: {e}")
+            if raise_errors:
+                raise
             return False
 
     def get_chunks_by_paper(
