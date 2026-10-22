@@ -19,6 +19,7 @@ class QueryBuilder:
             track_total_hits: bool = True,
             latest_papers: bool = False, 
             search_chunks: bool = False,
+            arxiv_id: Optional[str] = None,
     ):
         """Initialize query builder.
 
@@ -38,6 +39,7 @@ class QueryBuilder:
         self.track_total_hits = track_total_hits
         self.latest_papers = latest_papers
         self.search_chunks = search_chunks
+        self.arxiv_id = arxiv_id
         if fields is None: 
             if search_chunks: 
                 self.fields = ["chunk_text^3", "section_name^2", "title^1", "abstract^1", "authors^1"]
@@ -131,6 +133,8 @@ class QueryBuilder:
                     "categories": self.categories
                 }
             })
+        if self.arxiv_id:
+            filters.append({"term": {"arxiv_id": self.arxiv_id}})
         return filters   
         
     def _build_source_fields(self) -> Any:

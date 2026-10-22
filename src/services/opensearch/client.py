@@ -171,13 +171,17 @@ class OpenSearchClient:
             raise
 
     def search_papers(
-        self, query: str, size: int = 10, from_: int = 0, categories: Optional[List[str]] = None, latest: bool = True
+        self, query: str, size: int = 10, from_: int = 0, categories: Optional[List[str]] = None,
+        latest: bool = True, arxiv_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """BM25 search for papers."""
-        return self._search_bm25_only(query=query, size=size, from_=from_, categories=categories, latest=latest)
+        return self._search_bm25_only(
+            query=query, size=size, from_=from_, categories=categories, latest=latest, arxiv_id=arxiv_id
+        )
 
     def search_chunks_vector(
-        self, query_embedding: List[float], size: int = 10, categories: Optional[List[str]] = None
+        self, query_embedding: List[float], size: int = 10, categories: Optional[List[str]] = None,
+        arxiv_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Pure vector search on chunks.
 
@@ -191,6 +195,8 @@ class OpenSearchClient:
             filter_clause = []
             if categories:
                 filter_clause.append({"terms": {"categories": categories}})
+            if arxiv_id:
+                filter_clause.append({"term": {"arxiv_id": arxiv_id}})
 
             search_body = {
                 "size": size,
@@ -227,6 +233,7 @@ class OpenSearchClient:
         latest: bool = False,
         use_hybrid: bool = True,
         min_score: float = 0.0,
+        arxiv_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Unified search method supporting BM25, vector, and hybrid modes.
 
@@ -243,7 +250,9 @@ class OpenSearchClient:
         try:
             # If no embedding provided or hybrid disabled, use BM25 only
             if not query_embedding or not use_hybrid:
-                return self._search_bm25_only(query=query, size=size, from_=from_, categories=categories, latest=latest)
+                return self._search_bm25_only(
+                    query=query, size=size, from_=from_, categories=categories, latest=latest, arxiv_id=arxiv_id
+                )
 
             # Use native OpenSearch hybrid search with RRF pipeline
             return self._search_hybrid_native(
@@ -253,14 +262,18 @@ class OpenSearchClient:
                 from_=from_,
                 categories=categories,
                 min_score=min_score,
+                arxiv_id=arxiv_id,
             )
 
         except Exception as e:
             logger.error(f"Unified search error: {e}")
+            if arxiv_id is not None:
+                raise
             return {"total": 0, "hits": []}
 
     def _search_bm25_only(
-        self, query: str, size: int, from_: int, categories: Optional[List[str]], latest: bool
+        self, query: str, size: int, from_: int, categories: Optional[List[str]], latest: bool,
+        arxiv_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Pure BM25 search implementation."""
         builder = QueryBuilder(
@@ -270,6 +283,7 @@ class OpenSearchClient:
             categories=categories,
             latest_papers=latest,
             search_chunks=True,  # Enable chunk search mode
+            arxiv_id=arxiv_id,
         )
         search_body = builder.build()
 
@@ -298,21 +312,28 @@ class OpenSearchClient:
         from_: int,
         categories: Optional[List[str]],
         min_score: float,
+        arxiv_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Native OpenSearch hybrid search with RRF pipeline."""
         candidate_count = (from_ + size) * 2
         builder = QueryBuilder(
-            query=query, size=candidate_count, from_=0, categories=categories, latest_papers=False, search_chunks=True
+            query=query, size=candidate_count, from_=0, categories=categories, latest_papers=False,
+            search_chunks=True, arxiv_id=arxiv_id,
         )
         bm25_search_body = builder.build()
 
         bm25_query = bm25_search_body["query"]
         vector_query = {"knn": {"embedding": {"vector": query_embedding, "k": candidate_count}}}
+        vector_filters = []
         if categories:
+            vector_filters.append({"terms": {"categories": categories}})
+        if arxiv_id:
+            vector_filters.append({"term": {"arxiv_id": arxiv_id}})
+        if vector_filters:
             vector_query = {
                 "bool": {
                     "must": [vector_query],
-                    "filter": [{"terms": {"categories": categories}}],
+                    "filter": vector_filters,
                 }
             }
 
@@ -355,6 +376,7 @@ class OpenSearchClient:
         categories: Optional[List[str]] = None,
         min_score: float = 0.0,
         from_: int = 0,
+        arxiv_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Hybrid search combining BM25 and vector similarity using native RRF."""
         return self._search_hybrid_native(
@@ -364,6 +386,7 @@ class OpenSearchClient:
             from_=from_,
             categories=categories,
             min_score=min_score,
+            arxiv_id=arxiv_id,
         )
 
     def index_chunk(self, chunk_data: Dict[str, Any], embedding: List[float]) -> bool:
@@ -429,7 +452,9 @@ class OpenSearchClient:
             logger.error(f"Error deleting chunks: {e}")
             return False
 
-    def get_chunks_by_paper(self, arxiv_id: str) -> List[Dict[str, Any]]:
+    def get_chunks_by_paper(
+        self, arxiv_id: str, limit: int = 1000, raise_errors: bool = False
+    ) -> List[Dict[str, Any]]:
         """Get all chunks for a specific paper.
 
         :param arxiv_id: ArXiv ID of the paper
@@ -438,7 +463,7 @@ class OpenSearchClient:
         try:
             search_body = {
                 "query": {"term": {"arxiv_id": arxiv_id}},
-                "size": 1000,
+                "size": limit,
                 "sort": [{"chunk_index": "asc"}],
                 "_source": {"excludes": ["embedding"]},
             }
@@ -455,4 +480,6 @@ class OpenSearchClient:
 
         except Exception as e:
             logger.error(f"Error getting chunks: {e}")
+            if raise_errors:
+                raise
             return []

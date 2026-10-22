@@ -14,7 +14,7 @@ class RAGTracer:
         self.tracer = tracer
 
     @contextmanager
-    def trace_request(self, user_id: str, query: str):
+    def trace_request(self, user_id: str, query: str, metadata: Optional[Dict[str, Any]] = None):
         """Main request trace context manager."""
         trace = None
         try:
@@ -22,7 +22,7 @@ class RAGTracer:
                 query = query, 
                 user_id = user_id, 
                 session_id  = f"session_{user_id}",
-                metadata = {"simplified_tracing": True}
+                metadata = {"simplified_tracing": True, **(metadata or {})}
             ) as trace:
                 yield trace
         finally: 
@@ -44,9 +44,13 @@ class RAGTracer:
                 span.end()
 
     @contextmanager
-    def trace_search(self, trace, query: str, top_k: int):
+    def trace_search(self, trace, query: str, top_k: int, arxiv_id: Optional[str] = None):
         """Search operation with timing."""
-        span = self.tracer.create_span(trace=trace, name="search_retrieval", input_data={"query": query, "top_k": top_k})
+        span = self.tracer.create_span(
+            trace=trace,
+            name="search_retrieval",
+            input_data={"query": query, "top_k": top_k, "arxiv_id": arxiv_id},
+        )
         try:
             yield span
         finally:

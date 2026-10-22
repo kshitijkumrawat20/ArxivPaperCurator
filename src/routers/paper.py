@@ -2,11 +2,20 @@ from datetime import date
 
 from fastapi import APIRouter, Depends , HTTPException, Path, Query
 from sqlalchemy.orm import Session
-from src.dependencies import OpenSearchDep, SessionDep
+from src.dependencies import CacheDep, EmbeddingsDep, LangfuseDep, OllamaDep, OpenSearchDep, SessionDep
+from src.schema.api.ask import PaperAskRequest, PaperAskResponse
 from src.schema.arxiv.paper import PaperResponse, PaperSearchResponse
 from src.schema.api.search import MetadataDiscoveryResponse
 from src.respositories.paper import PaperRepository 
 from src.services.metadata_discovery import MetadataDiscoveryService
+from src.services.paper_scoped_rag import (
+    PaperGenerationUnavailableError,
+    PaperNotFoundError,
+    PaperNotIndexedError,
+    PaperScopedRAGService,
+    PaperSearchUnavailableError,
+)
+from src.services.langfuse.tracer import RAGTracer
 
 router = APIRouter(prefix = "/papers", tags=["Papers"])
 @router.get("/", response_model=PaperSearchResponse)
@@ -48,6 +57,44 @@ def discover_papers(
         **{"from": offset},
         papers=result["hits"],
     )
+
+
+@router.post("/{arxiv_id}/ask", response_model=PaperAskResponse)
+async def ask_about_paper(
+    request: PaperAskRequest,
+    arxiv_id: str,
+    db: SessionDep,
+    opensearch: OpenSearchDep,
+    embeddings: EmbeddingsDep,
+    ollama: OllamaDep,
+    langfuse: LangfuseDep,
+    cache: CacheDep,
+) -> PaperAskResponse:
+    """Answer using evidence retrieved only from the exact selected paper ID."""
+    try:
+        service = PaperScopedRAGService(
+            paper_repository=PaperRepository(db),
+            opensearch_client=opensearch,
+            embeddings_service=embeddings,
+            ollama_client=ollama,
+            rag_tracer=RAGTracer(langfuse),
+            cache_client=cache,
+        )
+        return await service.ask(arxiv_id, request)
+    except PaperNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Paper {arxiv_id!r} was not found") from exc
+    except PaperNotIndexedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "full_text_not_indexed",
+                "message": "This paper exists as metadata, but its full text is not indexed. Full-text processing is required.",
+            },
+        ) from exc
+    except (PaperSearchUnavailableError, PaperGenerationUnavailableError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Paper question-answering service is unavailable") from exc
 
 
 @router.get("/{arxiv_id}", response_model=PaperResponse)

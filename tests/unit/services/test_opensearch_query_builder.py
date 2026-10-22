@@ -34,6 +34,11 @@ def test_query_builder_with_categories():
     assert filters[0]["terms"]["categories"] == ["cs.AI", "cs.LG"]
 
 
+def test_query_builder_can_restrict_lexical_search_to_exact_arxiv_version():
+    query = QueryBuilder(query="attention", arxiv_id="1706.03762v7", search_chunks=True).build()
+    assert {"term": {"arxiv_id": "1706.03762v7"}} in query["query"]["bool"]["filter"]
+
+
 def test_query_builder_latest_papers_sorting():
     builder = QueryBuilder(query="neural networks", latest_papers=True)
 

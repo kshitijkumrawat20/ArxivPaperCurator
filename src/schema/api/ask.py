@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,15 @@ class AskRequest(BaseModel):
         }
 
 
+class PaperAskRequest(BaseModel):
+    """Traditional RAG controls without global category-search parameters."""
+
+    query: str = Field(..., description="Question about this paper", min_length=1, max_length=1000)
+    top_k: int = Field(3, description="Number of paper chunks to retrieve", ge=1, le=10)
+    use_hybrid: bool = Field(True, description="Use paper-scoped BM25 + vector retrieval")
+    model: str = Field("qwen2.5-coder:1.5b", description="Ollama model to use for generation")
+
+
 class AskResponse(BaseModel):
     """Response model for RAG question answering."""
 
@@ -43,6 +52,25 @@ class AskResponse(BaseModel):
                 "search_mode": "hybrid",
             }
         }
+
+
+class PaperChunkReference(BaseModel):
+    """Evidence reference containing only provenance retained in the chunk index."""
+
+    chunk_id: Optional[str] = None
+    chunk_index: Optional[int] = None
+    section_title: Optional[str] = None
+    excerpt: str
+
+
+class PaperAskResponse(BaseModel):
+    query: str
+    answer: str
+    arxiv_id: str
+    source_url: str
+    evidence: List[PaperChunkReference]
+    chunks_used: int
+    retrieval_mode: Literal["bm25", "hybrid"]
 
 class AgenticAskResponse(AskResponse):
     """Response model for agentic RAG question answering."""

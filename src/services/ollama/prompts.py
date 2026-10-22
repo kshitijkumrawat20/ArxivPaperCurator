@@ -31,7 +31,9 @@ class RAGPromptBuilder:
             )
         return prompt_file.read_text().strip()
 
-    def create_rag_prompt(self, query: str, chunks: List[Dict[str, Any]]) -> str:
+    def create_rag_prompt(
+        self, query: str, chunks: List[Dict[str, Any]], paper_scope: str | None = None
+    ) -> str:
         """Create a RAG prompt with query and retrieved chunks.
 
         Args:
@@ -42,6 +44,13 @@ class RAGPromptBuilder:
             Formatted prompt string
         """
         prompt = f"{self.system_prompt}\n\n"
+        if paper_scope:
+            prompt += (
+                f"PAPER-SCOPED TASK: The only allowed source is arXiv:{paper_scope}. "
+                "Use only the excerpts below from this exact paper. Do not use other papers or outside knowledge. "
+                "If these excerpts do not provide enough evidence, explicitly say that the selected paper's "
+                "retrieved excerpts do not contain enough information to answer.\n\n"
+            )
         prompt += "### Context from Papers:\n\n"
 
         for i, chunk in enumerate(chunks, 1):
@@ -60,7 +69,9 @@ class RAGPromptBuilder:
 
         return prompt
 
-    def create_structured_prompt(self, query: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def create_structured_prompt(
+        self, query: str, chunks: List[Dict[str, Any]], paper_scope: str | None = None
+    ) -> Dict[str, Any]:
         """Create a prompt for Ollama with structured output format.
 
         Args:
@@ -70,7 +81,7 @@ class RAGPromptBuilder:
         Returns:
             Dictionary with prompt and format schema for Ollama
         """
-        prompt_text = self.create_rag_prompt(query, chunks)
+        prompt_text = self.create_rag_prompt(query, chunks, paper_scope=paper_scope)
 
         # Return prompt with Pydantic model schema for structured output
         return {

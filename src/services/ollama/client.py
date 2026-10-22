@@ -206,6 +206,7 @@ class OllamaClient:
         chunks: List[Dict[str, Any]],
         model: str = "llama3.2",
         use_structured_output: bool = False,
+        paper_scope: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate a RAG answer using retrieved chunks.
@@ -222,7 +223,7 @@ class OllamaClient:
         try:
             if use_structured_output:
                 # Use structured output with Pydantic model
-                prompt_data = self.prompt_builder.create_structured_prompt(query, chunks)
+                prompt_data = self.prompt_builder.create_structured_prompt(query, chunks, paper_scope=paper_scope)
 
                 # Generate with structured format
                 response = await self.generate(
@@ -234,7 +235,7 @@ class OllamaClient:
                 )
             else:
                 # Fallback to plain text mode
-                prompt = self.prompt_builder.create_rag_prompt(query, chunks)
+                prompt = self.prompt_builder.create_rag_prompt(query, chunks, paper_scope=paper_scope)
 
                 # Generate without format restrictions
                 response = await self.generate(
