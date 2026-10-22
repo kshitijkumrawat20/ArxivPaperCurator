@@ -1,0 +1,48 @@
+{
+  "format_version": "1.0",
+  "benchmark_id": "ai-ml-research-discovery",
+  "benchmark_version": "1.0.0",
+  "description": "Realistic query templates for human-reviewed Project Match and Research Radar evaluation. No relevance labels are supplied.",
+  "cases": [
+    {
+      "case_id": "project-rag-literature-assistant-001",
+      "query_type": "project_match",
+      "query": {
+        "project_title": "Grounded research literature assistant",
+        "project_description": "Build a literature assistant that retrieves scientific papers and grounds generated answers in cited passages from the source papers.",
+        "technologies": ["retrieval augmented generation", "dense retrieval", "reranking"],
+        "research_interests": ["faithful question answering", "citation attribution"]
+      },
+      "expected_filters": {"categories": ["cs.IR", "cs.CL"], "date_from": null, "date_to": null}
+    },
+    {
+      "case_id": "project-efficient-llm-serving-001",
+      "query_type": "project_match",
+      "query": {
+        "project_title": "Cost-efficient language model serving",
+        "project_description": "Serve transformer language models with lower memory and inference latency while preserving output quality under concurrent workloads.",
+        "technologies": ["quantization", "KV cache", "continuous batching"],
+        "research_interests": ["LLM inference", "memory efficiency"]
+      },
+      "expected_filters": {"categories": ["cs.CL", "cs.LG"], "date_from": "2022-01-01", "date_to": null}
+    },
+    {
+      "case_id": "radar-neural-information-retrieval-001",
+      "query_type": "research_radar",
+      "query": {
+        "topics": ["dense information retrieval", "neural reranking", "retrieval augmented generation"],
+        "lookback_days": 30
+      },
+      "expected_filters": {"categories": ["cs.IR", "cs.CL"], "date_from": null, "date_to": null}
+    },
+    {
+      "case_id": "radar-multimodal-representation-learning-001",
+      "query_type": "research_radar",
+      "query": {
+        "topics": ["vision language models", "multimodal representation learning"],
+        "lookback_days": 90
+      },
+      "expected_filters": {"categories": ["cs.CV", "cs.LG"], "date_from": null, "date_to": null}
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "format_version": "1.0",
+  "benchmark_id": "synthetic-metric-tests",
+  "benchmark_version": "1.0.0",
+  "rankings": [
+    {
+      "case_id": "synthetic-project-case",
+      "target": "project_match",
+      "retrieval_method": "synthetic-fixture-only",
+      "metadata_snapshot": "synthetic-2026-01",
+      "results": [
+        {"arxiv_id": "synthetic.0001v1", "rank": 1, "retrieval_score": 999.0},
+        {"arxiv_id": "synthetic.0003v1", "rank": 2, "retrieval_score": 0.001}
+      ]
+    }
+  ]
+}

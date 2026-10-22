@@ -1,0 +1,17 @@
+{
+  "format_version": "1.0",
+  "benchmark_id": "ai-ml-research-discovery",
+  "benchmark_version": "1.0.0",
+  "annotation_provenance": null,
+  "cases": [
+    {"case_id": "project-rag-literature-assistant-001", "target": "project_match", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "project-efficient-llm-serving-001", "target": "project_match", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-neural-information-retrieval-001", "target": "radar_fused", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-neural-information-retrieval-001", "target": "radar_topic", "topic_id": "dense information retrieval", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-neural-information-retrieval-001", "target": "radar_topic", "topic_id": "neural reranking", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-neural-information-retrieval-001", "target": "radar_topic", "topic_id": "retrieval augmented generation", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-multimodal-representation-learning-001", "target": "radar_fused", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-multimodal-representation-learning-001", "target": "radar_topic", "topic_id": "vision language models", "annotation_status": "unjudged", "judgments": []},
+    {"case_id": "radar-multimodal-representation-learning-001", "target": "radar_topic", "topic_id": "multimodal representation learning", "annotation_status": "unjudged", "judgments": []}
+  ]
+}

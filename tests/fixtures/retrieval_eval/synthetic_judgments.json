@@ -1,0 +1,17 @@
+{
+  "format_version": "1.0",
+  "benchmark_id": "synthetic-metric-tests",
+  "benchmark_version": "1.0.0",
+  "annotation_provenance": "Synthetic test labels; not human judgments and not a real-world relevance benchmark.",
+  "cases": [
+    {
+      "case_id": "synthetic-project-case",
+      "target": "project_match",
+      "annotation_status": "judged",
+      "judgments": [
+        {"arxiv_id": "synthetic.0001v1", "relevance": 3, "rationale": "Synthetic grade-three test fixture."},
+        {"arxiv_id": "synthetic.0002v1", "relevance": 1, "rationale": "Synthetic grade-one test fixture."}
+      ]
+    }
+  ]
+}

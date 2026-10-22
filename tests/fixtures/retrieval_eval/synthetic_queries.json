@@ -1,0 +1,8 @@
+{
+  "format_version": "1.0",
+  "benchmark_id": "synthetic-metric-tests",
+  "benchmark_version": "1.0.0",
+  "cases": [
+    {"case_id": "synthetic-project-case", "query_type": "project_match", "query": {"project_description": "Synthetic test query"}, "expected_filters": {}}
+  ]
+}
