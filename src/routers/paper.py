@@ -9,6 +9,7 @@ from src.dependencies import (
 from src.schema.api.ask import PaperAskRequest, PaperAskResponse
 from src.schema.api.deep_dive import PaperDeepDiveRequest, PaperDeepDiveResponse, PaperPreparationResponse
 from src.schema.api.project_match import ProjectMatchRequest, ProjectMatchResponse
+from src.schema.api.research_radar import ResearchRadarRequest, ResearchRadarResponse
 from src.schema.arxiv.paper import PaperResponse, PaperSearchResponse
 from src.schema.api.search import MetadataDiscoveryResponse
 from src.respositories.paper import PaperRepository 
@@ -42,6 +43,7 @@ from src.services.paper_deep_dive import (
     PaperDeepDiveService,
 )
 from src.services.project_paper_match import ProjectMatchSearchUnavailableError, ProjectPaperMatchService
+from src.services.research_radar import ResearchRadarService, ResearchRadarUnavailableError
 
 router = APIRouter(prefix = "/papers", tags=["Papers"])
 @router.get("/", response_model=PaperSearchResponse)
@@ -101,6 +103,23 @@ def match_project_to_papers(
         ) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Project matching is temporarily unavailable.") from exc
+
+
+@router.post("/radar", response_model=ResearchRadarResponse)
+def research_radar(
+    request: ResearchRadarRequest,
+    opensearch: OpenSearchDep,
+) -> ResearchRadarResponse:
+    """Return a recent, metadata-only feed for a bounded set of research topics."""
+    try:
+        return ResearchRadarService(opensearch).search(request)
+    except ResearchRadarUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Research radar is temporarily unavailable because all metadata searches failed.",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Research radar is temporarily unavailable.") from exc
 
 
 @router.post("/{arxiv_id}/prepare", response_model=PaperPreparationResponse)
